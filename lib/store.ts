@@ -39,6 +39,10 @@ export const useStore = create<StoreState>((set, get) => ({
   // Initial state
   loadedImage: null,
   imageScale: 1,
+  slabDimensions: {
+    width: 3000, // Default 3m slab
+    height: 1800, // Default 1.8m slab
+  },
   islandDimensions: defaultDimensions,
   
   selections: {
@@ -65,6 +69,8 @@ export const useStore = create<StoreState>((set, get) => ({
   setLoadedImage: (image) => set({ loadedImage: image }),
   
   setImageScale: (scale) => set({ imageScale: scale }),
+  
+  setSlabDimensions: (dimensions) => set({ slabDimensions: dimensions }),
   
   setIslandDimensions: (dimensions) => {
     const topAspect = dimensions.length / dimensions.width;

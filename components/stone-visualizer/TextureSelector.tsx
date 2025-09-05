@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Toggle } from '@/components/ui/toggle';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -19,8 +21,8 @@ import {
   X
 } from 'lucide-react';
 
-const MIN_CANVAS_WIDTH = 800;
-const MIN_CANVAS_HEIGHT = 600;
+const MIN_CANVAS_WIDTH = 1200;
+const MIN_CANVAS_HEIGHT = 900;
 
 interface SelectionBox {
   surface: 'top' | 'left' | 'right';
@@ -56,6 +58,8 @@ export default function TextureSelector() {
     selections,
     updateSelection,
     islandDimensions,
+    slabDimensions,
+    setSlabDimensions,
   } = useStore();
   
   // Calculate canvas size based on image and zoom
@@ -184,11 +188,13 @@ export default function TextureSelector() {
     ctx.strokeText(box.label, textX, textY);
     ctx.fillText(box.label, textX, textY);
     
-    // Draw dimensions
+    // Draw dimensions with calibrated scale
     ctx.font = '12px Arial';
     ctx.fillStyle = box.color;
-    const mmWidth = Math.round((selection.width / canvasSize.width) * islandDimensions.length);
-    const mmHeight = Math.round((selection.height / canvasSize.height) * islandDimensions.width);
+    // Calculate real-world dimensions based on slab calibration
+    const pixelsPerMm = canvasSize.width / slabDimensions.width;
+    const mmWidth = Math.round(selection.width / pixelsPerMm);
+    const mmHeight = Math.round(selection.height / pixelsPerMm);
     ctx.fillText(`${mmWidth}×${mmHeight}mm`, textX, selection.y - 5);
   };
   
@@ -315,6 +321,17 @@ export default function TextureSelector() {
     drawCanvas();
   }, [drawCanvas]);
   
+  // Force redraw when dialog opens
+  useEffect(() => {
+    if (selectorOpen && loadedImage) {
+      // Small delay to ensure dialog is fully rendered
+      const timer = setTimeout(() => {
+        drawCanvas();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectorOpen, loadedImage, drawCanvas]);
+  
   return (
     <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
       <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-auto">
@@ -332,6 +349,44 @@ export default function TextureSelector() {
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Calibration Section */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <h4 className="text-sm font-medium mb-3 text-amber-900 dark:text-amber-100">
+              📏 Slab Calibration - Enter Actual Dimensions
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="slab-width" className="text-xs">Slab Width (mm)</Label>
+                <Input
+                  id="slab-width"
+                  type="number"
+                  value={slabDimensions.width}
+                  onChange={(e) => setSlabDimensions({
+                    ...slabDimensions,
+                    width: parseInt(e.target.value) || 3000
+                  })}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label htmlFor="slab-height" className="text-xs">Slab Height (mm)</Label>
+                <Input
+                  id="slab-height"
+                  type="number"
+                  value={slabDimensions.height}
+                  onChange={(e) => setSlabDimensions({
+                    ...slabDimensions,
+                    height: parseInt(e.target.value) || 1800
+                  })}
+                  className="h-8"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+              Enter the actual dimensions of your stone slab for accurate cut sizing
+            </p>
+          </div>
+          
           {/* Controls */}
           <div className="flex items-center justify-between gap-4 p-4 bg-muted rounded-lg">
             <div className="flex items-center gap-2">

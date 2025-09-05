@@ -51,6 +51,12 @@ export interface StoreState {
   loadedImage: string | null;
   imageScale: number;
   
+  // Slab calibration
+  slabDimensions: {
+    width: number; // mm
+    height: number; // mm
+  };
+  
   // Dimensions
   islandDimensions: Dimensions;
   
@@ -81,6 +87,7 @@ export interface StoreState {
   // Actions
   setLoadedImage: (image: string | null) => void;
   setImageScale: (scale: number) => void;
+  setSlabDimensions: (dimensions: { width: number; height: number }) => void;
   setIslandDimensions: (dimensions: Dimensions) => void;
   updateSelection: (surface: Surface, selection: Selection) => void;
   applyTextures: () => void;
