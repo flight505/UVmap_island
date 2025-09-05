@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Island Stone Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        #controls {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 10;
+        }
+        
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        h3 {
+            color: #555;
+            margin: 15px 0 10px 0;
+            font-size: 16px;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button.active {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px dashed #667eea;
+            border-radius: 5px;
+            background: white;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        #viewer {
+            flex: 1;
+            position: relative;
+        }
+        
+        #canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        #textureSelector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 100;
+            max-width: 600px;
+        }
+        
+        #selectorCanvas {
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            cursor: move;
+            display: block;
+            margin-top: 10px;
+        }
+        
+        .selector-box {
+            position: absolute;
+            border: 3px solid;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 0 4px rgba(0,0,0,0.8);
+            font-size: 14px;
+            user-select: none;
+        }
+        
+        .selector-box.top {
+            border-color: #FF6B6B;
+            background: rgba(255, 107, 107, 0.2);
+        }
+        
+        .selector-box.left {
+            border-color: #4ECDC4;
+            background: rgba(78, 205, 196, 0.2);
+        }
+        
+        .selector-box.right {
+            border-color: #45B7D1;
+            background: rgba(69, 183, 209, 0.2);
+        }
+        
+        .dimension-info {
+            background: #e8f4f8;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 13px;
+            color: #444;
+        }
+        
+        .surface-info {
+            margin: 5px 0;
+            padding: 5px;
+            background: white;
+            border-radius: 3px;
+        }
+        
+        .status {
+            padding: 10px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            margin: 10px 0;
+            border-radius: 0 5px 5px 0;
+            font-size: 14px;
+        }
+        
+        #resetView {
+            background: #ff6b6b;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        #resetView:hover {
+            background: #ff5252;
+        }
+        
+        .slider-value {
+            display: inline-block;
+            width: 50px;
+            text-align: right;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .scale-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        
+        .scale-controls input {
+            flex: 1;
+        }
+        
+        .scale-controls span {
+            min-width: 60px;
+        }
+        
+        #applyTextures {
+            background: #4CAF50;
+            width: 100%;
+            font-size: 16px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        
+        #applyTextures:hover {
+            background: #45a049;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 15px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border: 2px solid;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h2>🏗️ Kitchen Island Stone Visualizer</h2>
+        
+        <div class="control-group">
+            <h3>📁 Stone Slab Image</h3>
+            <input type="file" id="imageUpload" accept="image/*">
+            <div class="status">Upload your stone slab image to begin</div>
+        </div>
+        
+        <div class="control-group">
+            <h3>📏 Island Dimensions</h3>
+            <div class="dimension-info">
+                <strong>Overall:</strong><br>
+                Length: 2440mm | Width: 1234mm | Height: 880mm<br><br>
+                <strong>Stone Surfaces:</strong>
+                <div class="surface-info">🔴 <strong>Top:</strong> 2440mm × 1234mm</div>
+                <div class="surface-info">🟢 <strong>Left Side:</strong> 2440mm × 880mm</div>
+                <div class="surface-info">🔵 <strong>Right Side:</strong> 2440mm × 880mm</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>🎨 Texture Mapping</h3>
+            <button id="openSelector">Open Texture Selector</button>
+            <div class="scale-controls">
+                <label>Image Scale:</label>
+                <input type="range" id="imageScale" min="50" max="200" value="100">
+                <span id="scaleValue">100%</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <h3>🔄 View Controls</h3>
+            <label>Rotation Speed: <span class="slider-value" id="rotSpeed">0.5</span></label>
+            <input type="range" id="rotationSpeed" min="0" max="2" step="0.1" value="0.5">
+            <label>
+                <input type="checkbox" id="autoRotate"> Auto Rotate
+            </label>
+            <button id="resetView">Reset View</button>
+        </div>
+        
+        <div class="control-group">
+            <h3>💡 Lighting</h3>
+            <label>Intensity: <span class="slider-value" id="lightInt">1.0</span></label>
+            <input type="range" id="lightIntensity" min="0.5" max="2" step="0.1" value="1">
+        </div>
+    </div>
+    
+    <div id="viewer">
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <div id="textureSelector">
+        <h3>📐 Position the cuts on your stone slab</h3>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="border-color: #FF6B6B; background: rgba(255, 107, 107, 0.3);"></div>
+                <span>Top</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="border-color: #4ECDC4; background: rgba(78, 205, 196, 0.3);"></div>
+                <span>Left</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="border-color: #45B7D1; background: rgba(69, 183, 209, 0.3);"></div>
+                <span>Right</span>
+            </div>
+        </div>
+        <canvas id="selectorCanvas"></canvas>
+        <button id="applyTextures">Apply Textures to Island</button>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        let scene, camera, renderer, island;
+        let autoRotate = false;
+        let loadedImage = null;
+        let imageScale = 1;
+        
+        // Real dimensions in mm
+        const dimensions = {
+            length: 2440,
+            width: 1234,
+            height: 880,
+            thickness: 20
+        };
+        
+        // Scale for 3D display (mm to scene units)
+        const SCALE = 0.001;
+        
+        // Texture selector state
+        let selectorCanvas, selectorCtx;
+        let selectionBoxes = {
+            top: { x: 10, y: 10, width: 0, height: 0, aspectRatio: dimensions.length / dimensions.width },
+            left: { x: 10, y: 150, width: 0, height: 0, aspectRatio: dimensions.length / dimensions.height },
+            right: { x: 250, y: 150, width: 0, height: 0, aspectRatio: dimensions.length / dimensions.height }
+        };
+        let dragging = null;
+        let dragOffset = { x: 0, y: 0 };
+        
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0);
+            scene.fog = new THREE.Fog(0xf0f0f0, 10, 50);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                60,
+                (window.innerWidth - 380) / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(4, 3, 5);
+            camera.lookAt(0, 0, 0);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById('canvas'),
+                antialias: true
+            });
+            renderer.setSize(window.innerWidth - 380, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.camera.near = 0.1;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -10;
+            directionalLight.shadow.camera.right = 10;
+            directionalLight.shadow.camera.top = 10;
+            directionalLight.shadow.camera.bottom = -10;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            const pointLight = new THREE.PointLight(0xffffff, 0.5);
+            pointLight.position.set(-5, 5, -5);
+            scene.add(pointLight);
+            
+            // Create kitchen island
+            createIsland();
+            
+            // Add floor
+            const floorGeometry = new THREE.PlaneGeometry(20, 20);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xe0e0e0,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -(dimensions.height * SCALE) / 2 - 0.01;
+            floor.receiveShadow = true;
+            scene.add(floor);
+            
+            // Setup texture selector canvas
+            setupTextureSelector();
+            
+            // Mouse controls for 3D view
+            setupMouseControls();
+            
+            animate();
+        }
+        
+        function createIsland() {
+            const geometry = new THREE.BoxGeometry(
+                dimensions.length * SCALE,
+                dimensions.height * SCALE,
+                dimensions.width * SCALE
+            );
+            
+            // Create materials for each face
+            // BoxGeometry faces: +X, -X, +Y, -Y, +Z, -Z
+            const materials = [
+                new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.3, metalness: 0.7 }), // right (short side)
+                new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.3, metalness: 0.7 }), // left (short side)
+                new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.2, metalness: 0.8 }), // top
+                new THREE.MeshStandardMaterial({ color: 0x404040, roughness: 0.3, metalness: 0.7 }), // bottom
+                new THREE.MeshStandardMaterial({ color: 0x707070, roughness: 0.3, metalness: 0.7 }), // front (long side - right)
+                new THREE.MeshStandardMaterial({ color: 0x707070, roughness: 0.3, metalness: 0.7 })  // back (long side - left)
+            ];
+            
+            island = new THREE.Mesh(geometry, materials);
+            island.castShadow = true;
+            island.receiveShadow = true;
+            scene.add(island);
+        }
+        
+        function setupTextureSelector() {
+            selectorCanvas = document.getElementById('selectorCanvas');
+            selectorCtx = selectorCanvas.getContext('2d');
+            
+            selectorCanvas.addEventListener('mousedown', handleMouseDown);
+            selectorCanvas.addEventListener('mousemove', handleMouseMove);
+            selectorCanvas.addEventListener('mouseup', handleMouseUp);
+            selectorCanvas.addEventListener('mouseleave', handleMouseUp);
+        }
+        
+        function calculateBoxDimensions() {
+            if (!loadedImage) return;
+            
+            const maxWidth = 550;
+            const baseSize = 150; // Base size for rectangles
+            
+            // Calculate sizes based on actual proportions
+            // Top surface
+            selectionBoxes.top.width = baseSize;
+            selectionBoxes.top.height = baseSize / selectionBoxes.top.aspectRatio;
+            
+            // Side surfaces (left and right have same dimensions)
+            selectionBoxes.left.width = baseSize;
+            selectionBoxes.left.height = baseSize / selectionBoxes.left.aspectRatio;
+            
+            selectionBoxes.right.width = baseSize;
+            selectionBoxes.right.height = baseSize / selectionBoxes.right.aspectRatio;
+        }
+        
+        function drawTextureSelector() {
+            if (!loadedImage) return;
+            
+            const img = new Image();
+            img.onload = () => {
+                // Set canvas size based on image and scale
+                const scaledWidth = img.width * (imageScale / 100);
+                const scaledHeight = img.height * (imageScale / 100);
+                
+                selectorCanvas.width = Math.min(scaledWidth, 600);
+                selectorCanvas.height = scaledHeight * (selectorCanvas.width / scaledWidth);
+                
+                // Clear and draw scaled image
+                selectorCtx.clearRect(0, 0, selectorCanvas.width, selectorCanvas.height);
+                selectorCtx.drawImage(img, 0, 0, selectorCanvas.width, selectorCanvas.height);
+                
+                // Draw selection boxes
+                drawSelectionBox('top', '#FF6B6B', 'Top');
+                drawSelectionBox('left', '#4ECDC4', 'Left');
+                drawSelectionBox('right', '#45B7D1', 'Right');
+            };
+            img.src = loadedImage;
+        }
+        
+        function drawSelectionBox(name, color, label) {
+            const box = selectionBoxes[name];
+            
+            selectorCtx.strokeStyle = color;
+            selectorCtx.lineWidth = 3;
+            selectorCtx.strokeRect(box.x, box.y, box.width, box.height);
+            
+            // Semi-transparent fill
+            selectorCtx.fillStyle = color + '33';
+            selectorCtx.fillRect(box.x, box.y, box.width, box.height);
+            
+            // Label
+            selectorCtx.fillStyle = 'white';
+            selectorCtx.strokeStyle = 'black';
+            selectorCtx.lineWidth = 3;
+            selectorCtx.font = 'bold 16px Arial';
+            selectorCtx.textAlign = 'center';
+            selectorCtx.textBaseline = 'middle';
+            
+            const textX = box.x + box.width / 2;
+            const textY = box.y + box.height / 2;
+            
+            selectorCtx.strokeText(label, textX, textY);
+            selectorCtx.fillText(label, textX, textY);
+        }
+        
+        function handleMouseDown(e) {
+            const rect = selectorCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Check which box was clicked
+            for (const [name, box] of Object.entries(selectionBoxes)) {
+                if (x >= box.x && x <= box.x + box.width &&
+                    y >= box.y && y <= box.y + box.height) {
+                    dragging = name;
+                    dragOffset.x = x - box.x;
+                    dragOffset.y = y - box.y;
+                    break;
+                }
+            }
+        }
+        
+        function handleMouseMove(e) {
+            if (!dragging) {
+                // Change cursor when hovering over boxes
+                const rect = selectorCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                let overBox = false;
+                for (const box of Object.values(selectionBoxes)) {
+                    if (x >= box.x && x <= box.x + box.width &&
+                        y >= box.y && y <= box.y + box.height) {
+                        overBox = true;
+                        break;
+                    }
+                }
+                
+                selectorCanvas.style.cursor = overBox ? 'move' : 'default';
+                return;
+            }
+            
+            const rect = selectorCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const box = selectionBoxes[dragging];
+            
+            // Update position with bounds checking
+            box.x = Math.max(0, Math.min(selectorCanvas.width - box.width, x - dragOffset.x));
+            box.y = Math.max(0, Math.min(selectorCanvas.height - box.height, y - dragOffset.y));
+            
+            drawTextureSelector();
+        }
+        
+        function handleMouseUp() {
+            dragging = null;
+        }
+        
+        function applyTextures() {
+            if (!loadedImage) return;
+            
+            const img = new Image();
+            img.onload = () => {
+                // Calculate scale factor between canvas and original image
+                const scaleX = img.width / selectorCanvas.width;
+                const scaleY = img.height / selectorCanvas.height;
+                
+                // Apply texture to each surface
+                applyTextureToFace('top', img, scaleX, scaleY, 2);
+                applyTextureToFace('left', img, scaleX, scaleY, 5);
+                applyTextureToFace('right', img, scaleX, scaleY, 4);
+                
+                document.querySelector('.status').textContent = 'Textures applied successfully!';
+                document.querySelector('.status').style.background = '#d4edda';
+                document.querySelector('.status').style.borderColor = '#28a745';
+            };
+            img.src = loadedImage;
+        }
+        
+        function applyTextureToFace(face, img, scaleX, scaleY, materialIndex) {
+            const box = selectionBoxes[face];
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Calculate source rectangle in original image
+            const srcX = box.x * scaleX;
+            const srcY = box.y * scaleY;
+            const srcW = box.width * scaleX;
+            const srcH = box.height * scaleY;
+            
+            // Set canvas size to match the cropped area
+            canvas.width = srcW;
+            canvas.height = srcH;
+            
+            // Draw cropped portion
+            ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+            
+            // Create texture
+            const textureLoader = new THREE.TextureLoader();
+            const texture = textureLoader.load(canvas.toDataURL());
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            
+            // Apply to material
+            island.material[materialIndex] = new THREE.MeshStandardMaterial({
+                map: texture,
+                roughness: 0.3,
+                metalness: 0.1
+            });
+        }
+        
+        function setupMouseControls() {
+            let mouseX = 0, mouseY = 0;
+            let targetRotationX = 0, targetRotationY = 0;
+            let isMouseDown = false;
+            
+            const canvas = document.getElementById('canvas');
+            
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    isMouseDown = true;
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (isMouseDown) {
+                    const deltaX = e.clientX - mouseX;
+                    const deltaY = e.clientY - mouseY;
+                    
+                    targetRotationY += deltaX * 0.01;
+                    targetRotationX += deltaY * 0.01;
+                    
+                    targetRotationX = Math.max(-Math.PI/2, Math.min(Math.PI/2, targetRotationX));
+                    
+                    mouseX = e.clientX;
+                    mouseY = e.clientY;
+                }
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+            
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY * 0.001;
+                camera.position.multiplyScalar(1 + delta);
+                
+                const distance = camera.position.length();
+                if (distance < 2) camera.position.setLength(2);
+                if (distance > 15) camera.position.setLength(15);
+            });
+            
+            window.updateRotation = function() {
+                if (!autoRotate) {
+                    island.rotation.y += (targetRotationY - island.rotation.y) * 0.1;
+                    island.rotation.x += (targetRotationX - island.rotation.x) * 0.1;
+                }
+            };
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (autoRotate) {
+                const speed = parseFloat(document.getElementById('rotationSpeed').value);
+                island.rotation.y += 0.01 * speed;
+            } else {
+                window.updateRotation();
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Event handlers
+        document.getElementById('imageUpload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    loadedImage = event.target.result;
+                    calculateBoxDimensions();
+                    document.querySelector('.status').textContent = 'Image loaded! Click "Open Texture Selector" to position cuts.';
+                    document.querySelector('.status').style.background = '#d4edda';
+                    document.querySelector('.status').style.borderColor = '#28a745';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        document.getElementById('openSelector').addEventListener('click', () => {
+            if (!loadedImage) {
+                alert('Please upload a stone slab image first!');
+                return;
+            }
+            
+            document.getElementById('textureSelector').style.display = 'block';
+            drawTextureSelector();
+        });
+        
+        document.getElementById('applyTextures').addEventListener('click', () => {
+            applyTextures();
+            document.getElementById('textureSelector').style.display = 'none';
+        });
+        
+        document.getElementById('imageScale').addEventListener('input', (e) => {
+            imageScale = parseFloat(e.target.value) / 100;
+            document.getElementById('scaleValue').textContent = e.target.value + '%';
+            if (loadedImage) drawTextureSelector();
+        });
+        
+        document.getElementById('autoRotate').addEventListener('change', (e) => {
+            autoRotate = e.target.checked;
+        });
+        
+        document.getElementById('rotationSpeed').addEventListener('input', (e) => {
+            document.getElementById('rotSpeed').textContent = e.target.value;
+        });
+        
+        document.getElementById('lightIntensity').addEventListener('input', (e) => {
+            const intensity = parseFloat(e.target.value);
+            document.getElementById('lightInt').textContent = intensity.toFixed(1);
+            scene.children.forEach(child => {
+                if (child instanceof THREE.Light) {
+                    child.intensity = child instanceof THREE.AmbientLight ? 
+                        0.6 * intensity : 0.8 * intensity;
+                }
+            });
+        });
+        
+        document.getElementById('resetView').addEventListener('click', () => {
+            camera.position.set(4, 3, 5);
+            camera.lookAt(0, 0, 0);
+            island.rotation.set(0, 0, 0);
+        });
+        
+        // Window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = (window.innerWidth - 380) / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth - 380, window.innerHeight);
+        });
+        
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
