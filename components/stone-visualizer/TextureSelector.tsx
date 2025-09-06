@@ -39,6 +39,7 @@ const SELECTION_BOXES: SelectionBox[] = [
 export default function TextureSelector() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cachedImageRef = useRef<HTMLImageElement | null>(null);
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -62,12 +63,16 @@ export default function TextureSelector() {
     setSlabDimensions,
   } = useStore();
   
-  // Calculate canvas size based on image and zoom
+  // Cache the image when it changes
   useEffect(() => {
-    if (!loadedImage) return;
+    if (!loadedImage) {
+      cachedImageRef.current = null;
+      return;
+    }
     
     const img = new Image();
     img.onload = () => {
+      cachedImageRef.current = img;
       const aspectRatio = img.width / img.height;
       const baseWidth = Math.max(MIN_CANVAS_WIDTH, Math.min(1200, img.width * 0.8));
       const baseHeight = baseWidth / aspectRatio;
@@ -83,7 +88,8 @@ export default function TextureSelector() {
   // Draw the canvas
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !loadedImage) return;
+    const cachedImage = cachedImageRef.current;
+    if (!canvas || !cachedImage) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -99,41 +105,36 @@ export default function TextureSelector() {
     // Clear canvas
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
     
-    // Draw image with pan offset
-    const img = new Image();
-    img.onload = () => {
-      ctx.save();
-      
-      // Apply pan transformation
-      ctx.translate(selectorPan.x, selectorPan.y);
-      
-      // Enable high-quality image rendering
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      
-      // Draw the image
-      ctx.drawImage(img, 0, 0, canvasSize.width, canvasSize.height);
-      
-      // Draw grid overlay if enabled
-      if (showGrid) {
-        drawGrid(ctx, canvasSize.width, canvasSize.height);
-      }
-      
-      // Draw selection boxes
-      SELECTION_BOXES.forEach(box => {
-        drawSelectionBox(ctx, box, selections[box.surface]);
-      });
-      
-      // Draw alignment guides if enabled
-      if (showAlignment) {
-        drawAlignmentGuides(ctx);
-      }
-      
-      ctx.restore();
-    };
-    img.src = loadedImage;
+    ctx.save();
+    
+    // Apply pan transformation
+    ctx.translate(selectorPan.x, selectorPan.y);
+    
+    // Enable high-quality image rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
+    // Draw the cached image
+    ctx.drawImage(cachedImage, 0, 0, canvasSize.width, canvasSize.height);
+    
+    // Draw grid overlay if enabled
+    if (showGrid) {
+      drawGrid(ctx, canvasSize.width, canvasSize.height);
+    }
+    
+    // Draw selection boxes
+    SELECTION_BOXES.forEach(box => {
+      drawSelectionBox(ctx, box, selections[box.surface]);
+    });
+    
+    // Draw alignment guides if enabled
+    if (showAlignment) {
+      drawAlignmentGuides(ctx);
+    }
+    
+    ctx.restore();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasSize, loadedImage, selectorPan, selections, showGrid, showAlignment]);
+  }, [canvasSize, selectorPan, selections, showGrid, showAlignment]);
   
   // Draw grid overlay
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -334,7 +335,7 @@ export default function TextureSelector() {
   
   return (
     <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
-      <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-auto">
+      <DialogContent className="w-[95vw] max-w-[1600px] h-[95vh] max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Position Stone Cuts</span>
@@ -348,9 +349,9 @@ export default function TextureSelector() {
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="flex-1 flex flex-col space-y-3 overflow-hidden">
           {/* Calibration Section */}
-          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
             <h4 className="text-sm font-medium mb-3 text-amber-900 dark:text-amber-100">
               📏 Slab Calibration - Enter Actual Dimensions
             </h4>
@@ -388,7 +389,7 @@ export default function TextureSelector() {
           </div>
           
           {/* Controls */}
-          <div className="flex items-center justify-between gap-4 p-4 bg-muted rounded-lg">
+          <div className="flex items-center justify-between gap-4 p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -449,7 +450,7 @@ export default function TextureSelector() {
           {/* Canvas container */}
           <div 
             ref={containerRef}
-            className="relative border-2 border-border rounded-lg overflow-auto max-h-[60vh] bg-muted/50"
+            className="relative flex-1 border-2 border-border rounded-lg overflow-auto bg-muted/50"
             style={{ cursor: isPanning ? 'grabbing' : isDragging ? 'move' : 'grab' }}
           >
             <canvas
