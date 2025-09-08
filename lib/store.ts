@@ -8,13 +8,18 @@ const defaultDimensions: Dimensions = {
   thickness: 20,
 };
 
-const defaultSelection = (aspectRatio: number): Selection => ({
-  x: 10,
-  y: 10,
-  width: 200,
-  height: 200 / aspectRatio,
-  aspectRatio,
-});
+const defaultSelection = (width: number, height: number): Selection => {
+  // Create selections sized proportionally to actual island dimensions
+  // Scale down to reasonable canvas sizes while maintaining aspect ratio
+  const scale = 0.15; // Scale factor to make selections visible on canvas
+  return {
+    x: 10,
+    y: 10,
+    width: width * scale,
+    height: height * scale,
+    aspectRatio: width / height,
+  };
+};
 
 const defaultCameraSettings: CameraSettings = {
   autoRotate: false,
@@ -40,15 +45,15 @@ export const useStore = create<StoreState>((set, get) => ({
   loadedImage: null,
   imageScale: 1,
   slabDimensions: {
-    width: 3000, // Default 3m slab
-    height: 1800, // Default 1.8m slab
+    width: 9060, // Default for 3 slabs side-by-side (3020mm each)
+    height: 2020, // Default slab height
   },
   islandDimensions: defaultDimensions,
   
   selections: {
-    top: defaultSelection(defaultDimensions.length / defaultDimensions.width),
-    left: defaultSelection(defaultDimensions.length / defaultDimensions.height),
-    right: defaultSelection(defaultDimensions.length / defaultDimensions.height),
+    top: defaultSelection(defaultDimensions.length, defaultDimensions.width),
+    left: defaultSelection(defaultDimensions.length, defaultDimensions.height),
+    right: defaultSelection(defaultDimensions.length, defaultDimensions.height),
   },
   
   appliedTextures: {
@@ -73,15 +78,12 @@ export const useStore = create<StoreState>((set, get) => ({
   setSlabDimensions: (dimensions) => set({ slabDimensions: dimensions }),
   
   setIslandDimensions: (dimensions) => {
-    const topAspect = dimensions.length / dimensions.width;
-    const sideAspect = dimensions.length / dimensions.height;
-    
     set({
       islandDimensions: dimensions,
       selections: {
-        top: defaultSelection(topAspect),
-        left: defaultSelection(sideAspect),
-        right: defaultSelection(sideAspect),
+        top: defaultSelection(dimensions.length, dimensions.width),
+        left: defaultSelection(dimensions.length, dimensions.height),
+        right: defaultSelection(dimensions.length, dimensions.height),
       },
     });
   },

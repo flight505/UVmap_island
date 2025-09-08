@@ -21,8 +21,8 @@ import {
   X
 } from 'lucide-react';
 
-const MIN_CANVAS_WIDTH = 1200;
-const MIN_CANVAS_HEIGHT = 900;
+const MIN_CANVAS_WIDTH = 1600;
+const MIN_CANVAS_HEIGHT = 1200;
 
 interface SelectionBox {
   surface: 'top' | 'left' | 'right';
@@ -189,14 +189,18 @@ export default function TextureSelector() {
     ctx.strokeText(box.label, textX, textY);
     ctx.fillText(box.label, textX, textY);
     
-    // Draw dimensions with calibrated scale
+    // Draw actual island surface dimensions
     ctx.font = '12px Arial';
     ctx.fillStyle = box.color;
-    // Calculate real-world dimensions based on slab calibration
-    const pixelsPerMm = canvasSize.width / slabDimensions.width;
-    const mmWidth = Math.round(selection.width / pixelsPerMm);
-    const mmHeight = Math.round(selection.height / pixelsPerMm);
-    ctx.fillText(`${mmWidth}×${mmHeight}mm`, textX, selection.y - 5);
+    // Show the actual island surface dimensions for each face
+    let surfaceText = '';
+    if (box.surface === 'top') {
+      surfaceText = `${islandDimensions.length}×${islandDimensions.width}mm`;
+    } else {
+      // Both left and right sides have same dimensions
+      surfaceText = `${islandDimensions.length}×${islandDimensions.height}mm`;
+    }
+    ctx.fillText(surfaceText, textX, selection.y - 5);
   };
   
   // Draw alignment guides between selections
@@ -335,7 +339,7 @@ export default function TextureSelector() {
   
   return (
     <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
-      <DialogContent className="w-[95vw] max-w-[1600px] h-[95vh] max-h-[95vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-[98vw] h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Position Stone Cuts</span>
@@ -353,20 +357,21 @@ export default function TextureSelector() {
           {/* Calibration Section */}
           <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
             <h4 className="text-sm font-medium mb-3 text-amber-900 dark:text-amber-100">
-              📏 Slab Calibration - Enter Actual Dimensions
+              📏 Slab Calibration - Total Dimensions of 3 Connected Slabs
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="slab-width" className="text-xs">Slab Width (mm)</Label>
+                <Label htmlFor="slab-width" className="text-xs">Total Width of 3 Slabs (mm)</Label>
                 <Input
                   id="slab-width"
                   type="number"
                   value={slabDimensions.width}
                   onChange={(e) => setSlabDimensions({
                     ...slabDimensions,
-                    width: parseInt(e.target.value) || 3000
+                    width: parseInt(e.target.value) || 9060
                   })}
                   className="h-8"
+                  placeholder="e.g., 9060 for 3×3020mm"
                 />
               </div>
               <div>
@@ -377,14 +382,16 @@ export default function TextureSelector() {
                   value={slabDimensions.height}
                   onChange={(e) => setSlabDimensions({
                     ...slabDimensions,
-                    height: parseInt(e.target.value) || 1800
+                    height: parseInt(e.target.value) || 2020
                   })}
                   className="h-8"
+                  placeholder="e.g., 2020"
                 />
               </div>
             </div>
             <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
-              Enter the actual dimensions of your stone slab for accurate cut sizing
+              ℹ️ Your image shows 3 slabs side-by-side. Enter the combined width of all 3 slabs and their height.
+              Position the colored rectangles on each slab area (left, top, right) to map them to your island surfaces.
             </p>
           </div>
           
@@ -463,13 +470,16 @@ export default function TextureSelector() {
             />
             
             {/* Instructions overlay */}
-            <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur p-3 rounded-md text-sm">
+            <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur p-3 rounded-md text-sm max-w-md">
               <div className="flex items-center gap-2 mb-1">
                 <Move className="h-4 w-4" />
-                <span>Drag rectangles to position cuts</span>
+                <span>Position cuts on your 3-slab layout</span>
               </div>
-              <div className="text-muted-foreground text-xs">
-                Click and drag on empty space to pan • Scroll to zoom
+              <div className="text-muted-foreground text-xs space-y-1">
+                <div>• Left box → Left slab → Left side of island</div>
+                <div>• Top box → Middle slab → Top of island</div>
+                <div>• Right box → Right slab → Right side of island</div>
+                <div className="pt-1 border-t border-border mt-1">Click and drag boxes to position • Pan with empty space • Zoom with controls</div>
               </div>
             </div>
           </div>
