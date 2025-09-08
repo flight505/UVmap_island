@@ -83,7 +83,7 @@ export async function extractTextureFromSelection(
   selection: Selection,
   canvasWidth: number,
   canvasHeight: number,
-  surface?: 'top' | 'left' | 'right'
+  surface?: 'top' | 'left' | 'right' | 'countertop' | 'backsplash'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();

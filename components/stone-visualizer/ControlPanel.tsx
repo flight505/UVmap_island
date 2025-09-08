@@ -38,6 +38,7 @@ export default function ControlPanel() {
     updateViewSettings,
     resetView,
     exportConfiguration,
+    kitchenRunDimensions,
   } = useStore();
   
   const handleDimensionChange = (key: keyof typeof islandDimensions, value: string) => {
@@ -197,6 +198,54 @@ export default function ControlPanel() {
                     />
                   </div>
                 )}
+
+                {/* Focus presets */}
+                <div className="space-y-2">
+                  <Label>Focus</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        updateCameraSettings({ target: [0, 0, 0] });
+                      }}
+                    >
+                      Island
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const gap = 1000; // mm
+                        const z = - (islandDimensions.width / 2 + gap + kitchenRunDimensions.depth / 2) * 0.001;
+                        updateCameraSettings({ target: [0, 0, z] });
+                      }}
+                    >
+                      Countertop
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const gap = 1000; // mm
+                        const ctZ = - (islandDimensions.width / 2 + gap + kitchenRunDimensions.depth / 2) * 0.001;
+                        const z = ctZ - (kitchenRunDimensions.depth * 0.001 / 2 - kitchenRunDimensions.thickness * 0.001 / 2);
+                        updateCameraSettings({ target: [0, 0, z] });
+                      }}
+                    >
+                      Backsplash
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const gap = 1000; // mm
+                        const ctZ = - (islandDimensions.width / 2 + gap + kitchenRunDimensions.depth / 2) * 0.001;
+                        const bsZ = ctZ - (kitchenRunDimensions.depth * 0.001 / 2 - kitchenRunDimensions.thickness * 0.001 / 2);
+                        const midZ = (0 + bsZ) / 2;
+                        updateCameraSettings({ target: [0, 0, midZ], position: [6, 4, 8] });
+                      }}
+                    >
+                      Fit All
+                    </Button>
+                  </div>
+                </div>
                 
                 <Button
                   variant="outline"

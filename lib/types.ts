@@ -32,6 +32,7 @@ export interface CameraSettings {
   autoRotate: boolean;
   rotationSpeed: number;
   position: [number, number, number];
+  target: [number, number, number];
 }
 
 export interface ViewSettings {
@@ -47,7 +48,7 @@ export interface ExportSettings {
   includeMeasurements: boolean;
 }
 
-export type Surface = 'top' | 'left' | 'right';
+export type Surface = 'top' | 'left' | 'right' | 'countertop' | 'backsplash';
 
 export interface StoreState {
   // Image
@@ -62,12 +63,20 @@ export interface StoreState {
   
   // Dimensions
   islandDimensions: Dimensions;
+  kitchenRunDimensions: {
+    length: number; // mm countertop + backsplash run length
+    depth: number; // mm countertop depth
+    thickness: number; // mm countertop/backsplash thickness (visual)
+    backsplashHeight: number; // mm
+  };
   
   // Selections
   selections: {
     top: Selection;
     left: Selection;
     right: Selection;
+    countertop: Selection;
+    backsplash: Selection;
   };
   
   // Textures
@@ -75,6 +84,8 @@ export interface StoreState {
     top: string | null;
     left: string | null;
     right: string | null;
+    countertop: string | null;
+    backsplash: string | null;
   };
   
   // UI State
@@ -92,6 +103,7 @@ export interface StoreState {
   setImageScale: (scale: number) => void;
   setSlabDimensions: (dimensions: { width: number; height: number }) => void;
   setIslandDimensions: (dimensions: Dimensions) => void;
+  setKitchenRunDimensions: (dimensions: { length?: number; depth?: number; thickness?: number; backsplashHeight?: number }) => void;
   updateSelection: (surface: Surface, selection: Selection) => void;
   applyTextures: () => void;
   setSelectorOpen: (open: boolean) => void;

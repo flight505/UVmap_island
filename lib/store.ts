@@ -8,6 +8,13 @@ const defaultDimensions: Dimensions = {
   thickness: 20,
 };
 
+const defaultRunDimensions = {
+  length: 3000,
+  depth: 600,
+  thickness: 20,
+  backsplashHeight: 580,
+};
+
 const defaultSelection = (width: number, height: number): Selection => {
   // Create selections sized proportionally to actual island dimensions
   // Scale down to reasonable canvas sizes while maintaining aspect ratio
@@ -28,6 +35,7 @@ const defaultCameraSettings: CameraSettings = {
   autoRotate: false,
   rotationSpeed: 0.5,
   position: [4, 3, 5],
+  target: [0, 0, 0],
 };
 
 const defaultMaterialSettings: MaterialSettings = {
@@ -45,24 +53,29 @@ const defaultViewSettings: ViewSettings = {
 
 export const useStore = create<StoreState>((set, get) => ({
   // Initial state
-  loadedImage: null,
+  loadedImage: '/L25155.jpg',
   imageScale: 1,
   slabDimensions: {
     width: 9060, // Default for 3 slabs side-by-side (3020mm each)
     height: 2020, // Default slab height
   },
   islandDimensions: defaultDimensions,
+  kitchenRunDimensions: defaultRunDimensions,
   
   selections: {
     top: defaultSelection(defaultDimensions.length, defaultDimensions.width),
     left: defaultSelection(defaultDimensions.width, defaultDimensions.height),
     right: defaultSelection(defaultDimensions.width, defaultDimensions.height),
+    countertop: defaultSelection(defaultRunDimensions.length, defaultRunDimensions.depth),
+    backsplash: defaultSelection(defaultRunDimensions.length, defaultRunDimensions.backsplashHeight),
   },
   
   appliedTextures: {
     top: null,
     left: null,
     right: null,
+    countertop: null,
+    backsplash: null,
   },
   
   selectorOpen: false,
@@ -87,6 +100,22 @@ export const useStore = create<StoreState>((set, get) => ({
         top: defaultSelection(dimensions.length, dimensions.width),
         left: defaultSelection(dimensions.width, dimensions.height),
         right: defaultSelection(dimensions.width, dimensions.height),
+        // keep existing run selections unchanged
+        countertop: get().selections.countertop,
+        backsplash: get().selections.backsplash,
+      },
+    });
+  },
+  
+  // Optional setter for kitchen run
+  setKitchenRunDimensions: (run) => {
+    const rd = { ...get().kitchenRunDimensions, ...run };
+    set({
+      kitchenRunDimensions: rd,
+      selections: {
+        ...get().selections,
+        countertop: defaultSelection(rd.length, rd.depth),
+        backsplash: defaultSelection(rd.length, rd.backsplashHeight),
       },
     });
   },
@@ -111,6 +140,8 @@ export const useStore = create<StoreState>((set, get) => ({
         top: 'applied',
         left: 'applied',
         right: 'applied',
+        countertop: 'applied',
+        backsplash: 'applied',
       },
     });
   },

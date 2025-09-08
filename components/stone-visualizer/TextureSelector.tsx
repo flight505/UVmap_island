@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useStore } from '@/lib/store';
+import type { Surface } from '@/lib/types';
 import { extractTextureFromSelection } from '@/lib/texture-utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -29,7 +30,7 @@ const MIN_CANVAS_WIDTH = 1600;
 const MIN_CANVAS_HEIGHT = 1200;
 
 interface SelectionBox {
-  surface: 'top' | 'left' | 'right';
+  surface: Surface;
   color: string;
   label: string;
 }
@@ -38,20 +39,22 @@ const SELECTION_BOXES: SelectionBox[] = [
   { surface: 'top', color: '#FF6B6B', label: 'Top Plate' },
   { surface: 'left', color: '#4ECDC4', label: 'Left Side' },
   { surface: 'right', color: '#45B7D1', label: 'Right Side' },
+  { surface: 'countertop', color: '#A78BFA', label: 'Countertop' },
+  { surface: 'backsplash', color: '#22D3EE', label: 'Backsplash' },
 ];
 
 export default function TextureSelector() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const cachedImageRef = useRef<HTMLImageElement | null>(null);
-  const [isDragging, setIsDragging] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState<Surface | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [showGrid, setShowGrid] = useState(true);
   const [showAlignment, setShowAlignment] = useState(true);
   const [canvasSize, setCanvasSize] = useState({ width: MIN_CANVAS_WIDTH, height: MIN_CANVAS_HEIGHT });
-  const [selectedSurface, setSelectedSurface] = useState<'top' | 'left' | 'right' | null>(null);
+  const [selectedSurface, setSelectedSurface] = useState<Surface | null>(null);
   const [imageZoom, setImageZoom] = useState(1);
   const [baseCanvasSize, setBaseCanvasSize] = useState({ width: MIN_CANVAS_WIDTH, height: MIN_CANVAS_HEIGHT });
   
@@ -66,6 +69,8 @@ export default function TextureSelector() {
     islandDimensions,
     slabDimensions,
     setSlabDimensions,
+    kitchenRunDimensions,
+    setKitchenRunDimensions,
   } = useStore();
 
   // Align side selections to the top selection edges to reduce DoF
@@ -96,7 +101,7 @@ export default function TextureSelector() {
   }, [selections, updateSelection]);
   
   // Function to rotate a selection
-  const rotateSelection = (surface: 'top' | 'left' | 'right', direction: 'cw' | 'ccw') => {
+  const rotateSelection = (surface: Surface, direction: 'cw' | 'ccw') => {
     const selection = selections[surface];
     const currentRotation = selection.rotation || 0;
     const newRotation = direction === 'cw' 
@@ -110,7 +115,7 @@ export default function TextureSelector() {
   };
 
   // Function to flip a selection
-  const flipSelection = (surface: 'top' | 'left' | 'right', direction: 'horizontal' | 'vertical') => {
+  const flipSelection = (surface: Surface, direction: 'horizontal' | 'vertical') => {
     const selection = selections[surface];
     
     if (direction === 'horizontal') {
@@ -216,6 +221,24 @@ export default function TextureSelector() {
       ...selections.right,
       width: sideWidth,
       height: sideHeight,
+    });
+
+    // Countertop: length × depth (run)
+    const ctWidth = kitchenRunDimensions.length * mmToCanvasScale;
+    const ctHeight = kitchenRunDimensions.depth * mmToCanvasScale;
+    updateSelection('countertop', {
+      ...selections.countertop,
+      width: ctWidth,
+      height: ctHeight,
+    });
+
+    // Backsplash: length × height
+    const bsWidth = kitchenRunDimensions.length * mmToCanvasScale;
+    const bsHeight = kitchenRunDimensions.backsplashHeight * mmToCanvasScale;
+    updateSelection('backsplash', {
+      ...selections.backsplash,
+      width: bsWidth,
+      height: bsHeight,
     });
   }, [canvasSize, slabDimensions, islandDimensions]);
   
@@ -557,7 +580,7 @@ export default function TextureSelector() {
       const newX = Math.max(0, Math.min(canvasSize.width - selection.width, x - dragOffset.x));
       const newY = Math.max(0, Math.min(canvasSize.height - selection.height, y - dragOffset.y));
       
-      updateSelection(isDragging as 'top' | 'left' | 'right', {
+      updateSelection(isDragging as Surface, {
         ...selection,
         x: newX,
         y: newY,
@@ -605,16 +628,16 @@ export default function TextureSelector() {
     });
     
     const results = await Promise.all(promises);
-    
-    // Update store with texture URLs
-    const textures = results.reduce<{ top: string | null; left: string | null; right: string | null }>(
-      (acc, { surface, texture }) => ({
+
+    // Update store with texture URLs (include new surfaces)
+    const textures = results.reduce(
+      (acc: { [k: string]: string | null }, { surface, texture }) => ({
         ...acc,
         [surface]: texture,
       }),
-      { top: null, left: null, right: null }
-    );
-    
+      { top: null, left: null, right: null, countertop: null, backsplash: null }
+    ) as { top: string | null; left: string | null; right: string | null; countertop: string | null; backsplash: string | null };
+
     useStore.setState({ appliedTextures: textures });
     setSelectorOpen(false);
   };
@@ -722,6 +745,16 @@ export default function TextureSelector() {
                   <div className="space-y-1">
                     <div className="font-medium text-blue-900 dark:text-blue-100">Side Surfaces:</div>
                     <div className="text-blue-700 dark:text-blue-300">{islandDimensions.width} × {islandDimensions.height}mm</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="font-medium text-blue-900 dark:text-blue-100">Countertop:</div>
+                    <div className="text-blue-700 dark:text-blue-300">{kitchenRunDimensions.length} × {kitchenRunDimensions.depth}mm</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-medium text-blue-900 dark:text-blue-100">Backsplash:</div>
+                    <div className="text-blue-700 dark:text-blue-300">{kitchenRunDimensions.length} × {kitchenRunDimensions.backsplashHeight}mm</div>
                   </div>
                 </div>
                 <div className="pt-2 border-t border-blue-300 dark:border-blue-700">
@@ -839,6 +872,25 @@ export default function TextureSelector() {
               >
                 <Maximize2 className="h-4 w-4 mr-1" />
                 Align Sides to Top
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  // align backsplash to countertop horizontally (x), top-aligned (y)
+                  updateSelection('backsplash', {
+                    ...selections.backsplash,
+                    x: selections.countertop.x,
+                    y: selections.countertop.y,
+                    rotation: 0,
+                    flipH: false,
+                    flipV: false,
+                  });
+                }}
+                title="Align backsplash to countertop"
+              >
+                <Maximize2 className="h-4 w-4 mr-1" />
+                Align Backsplash
               </Button>
               <Button
                 size="sm"

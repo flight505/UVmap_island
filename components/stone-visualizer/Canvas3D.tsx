@@ -162,6 +162,119 @@ function IslandMesh({
   );
 }
 
+// Countertop Mesh (wall run)
+function CountertopMesh({ texture }: { texture?: THREE.Texture | null }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const { islandDimensions, kitchenRunDimensions, materialSettings } = useStore();
+  const { gl } = useThree();
+
+  // Configure map
+  useEffect(() => {
+    if (!texture) return;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.minFilter = THREE.LinearMipMapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    const maxAniso = gl.capabilities.getMaxAnisotropy?.() || 16;
+    texture.anisotropy = Math.min(32, maxAniso);
+    texture.generateMipmaps = true;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.center.set(0.5, 0.5);
+    texture.rotation = 0;
+    texture.repeat.set(1, 1);
+    texture.offset.set(0, 0);
+    texture.needsUpdate = true;
+  }, [texture, gl]);
+
+  const len = kitchenRunDimensions.length * SCALE;
+  const thick = kitchenRunDimensions.thickness * SCALE;
+  const depth = kitchenRunDimensions.depth * SCALE;
+
+  // Gap between island and wall run (1.0 m default)
+  const gap = 1000 * SCALE;
+
+  // Place behind island along -Z
+  const islandDepth = islandDimensions.width * SCALE;
+  const z = - (islandDepth / 2 + gap + depth / 2);
+  // Top flush with island top
+  const y = islandDimensions.height * SCALE / 2 - thick / 2;
+
+  const geom = new THREE.BoxGeometry(len, thick, depth);
+
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: 0x707070, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // +X
+    new THREE.MeshStandardMaterial({ color: 0x707070, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // -X
+    new THREE.MeshPhysicalMaterial({ map: texture || undefined, color: texture ? 0xffffff : 0x808080, roughness: Math.max(0.2, materialSettings.roughness * 0.9), metalness: materialSettings.metalness, clearcoat: 0.2, clearcoatRoughness: 0.5, envMapIntensity: materialSettings.envMapIntensity }), // +Y (top)
+    new THREE.MeshStandardMaterial({ color: 0x404040, roughness: 0.8, metalness: 0.2 }), // -Y
+    new THREE.MeshStandardMaterial({ color: 0x606060, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // +Z
+    new THREE.MeshStandardMaterial({ color: 0x606060, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // -Z
+  ];
+
+  return (
+    <mesh ref={meshRef} position={[0, y, z]} geometry={geom} material={materials} castShadow receiveShadow />
+  );
+}
+
+function TexturedCountertop({ textureUrl }: { textureUrl?: string | null }) {
+  const tex = useTexture(textureUrl!);
+  return <CountertopMesh texture={tex} />;
+}
+
+// Backsplash Mesh
+function BacksplashMesh({ texture }: { texture?: THREE.Texture | null }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const { islandDimensions, kitchenRunDimensions, materialSettings } = useStore();
+  const { gl } = useThree();
+
+  useEffect(() => {
+    if (!texture) return;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.minFilter = THREE.LinearMipMapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    const maxAniso = gl.capabilities.getMaxAnisotropy?.() || 16;
+    texture.anisotropy = Math.min(32, maxAniso);
+    texture.generateMipmaps = true;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.center.set(0.5, 0.5);
+    texture.rotation = 0;
+    texture.repeat.set(1, 1);
+    texture.offset.set(0, 0);
+    texture.needsUpdate = true;
+  }, [texture, gl]);
+
+  const len = kitchenRunDimensions.length * SCALE;
+  const height = kitchenRunDimensions.backsplashHeight * SCALE;
+  const thick = kitchenRunDimensions.thickness * SCALE;
+  const depth = kitchenRunDimensions.depth * SCALE;
+
+  const gap = 1000 * SCALE;
+  const islandDepth = islandDimensions.width * SCALE;
+  const countertopZ = - (islandDepth / 2 + gap + depth / 2);
+  const z = countertopZ - (depth / 2 - thick / 2); // sit at back edge
+  const y = islandDimensions.height * SCALE / 2 + height / 2; // sits on countertop top
+
+  const geom = new THREE.BoxGeometry(len, height, thick);
+
+  const materials = [
+    new THREE.MeshStandardMaterial({ color: 0x707070, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // +X
+    new THREE.MeshStandardMaterial({ color: 0x707070, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // -X
+    new THREE.MeshStandardMaterial({ color: 0x404040, roughness: 0.8, metalness: 0.2 }), // +Y
+    new THREE.MeshStandardMaterial({ color: 0x404040, roughness: 0.8, metalness: 0.2 }), // -Y
+    new THREE.MeshPhysicalMaterial({ map: texture || undefined, color: texture ? 0xffffff : 0x808080, roughness: Math.max(0.25, materialSettings.roughness), metalness: materialSettings.metalness, clearcoat: 0.15, clearcoatRoughness: 0.6, envMapIntensity: materialSettings.envMapIntensity }), // +Z (front)
+    new THREE.MeshStandardMaterial({ color: 0x606060, roughness: materialSettings.roughness, metalness: materialSettings.metalness }), // -Z (back)
+  ];
+
+  return (
+    <mesh ref={meshRef} position={[0, y, z]} geometry={geom} material={materials} castShadow receiveShadow />
+  );
+}
+
+function TexturedBacksplash({ textureUrl }: { textureUrl?: string | null }) {
+  const tex = useTexture(textureUrl!);
+  return <BacksplashMesh texture={tex} />;
+}
+
 function Scene() {
   const { 
     appliedTextures, 
@@ -224,6 +337,20 @@ function Scene() {
             leftTexture={null}
             rightTexture={null}
           />
+        )}
+      </Suspense>
+
+      {/* Countertop & Backsplash */}
+      <Suspense fallback={null}>
+        {appliedTextures.countertop ? (
+          <TexturedCountertop textureUrl={appliedTextures.countertop} />
+        ) : (
+          <CountertopMesh texture={null} />
+        )}
+        {appliedTextures.backsplash ? (
+          <TexturedBacksplash textureUrl={appliedTextures.backsplash} />
+        ) : (
+          <BacksplashMesh texture={null} />
         )}
       </Suspense>
       
@@ -294,7 +421,7 @@ function CameraController() {
         enableRotate={!cameraSettings.autoRotate}
         minDistance={2}
         maxDistance={15}
-        target={[0, 0, 0]}
+        target={cameraSettings.target}
         // Smooth controls
         enableDamping={true}
         dampingFactor={0.05}

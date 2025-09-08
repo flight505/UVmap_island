@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { resizeImage, shouldResizeImage } from '@/lib/texture-utils';
 import { Card } from '@/components/ui/card';
@@ -25,6 +25,25 @@ export default function ImageUploader() {
   } | null>(null);
   
   const { loadedImage, setLoadedImage } = useStore();
+  
+  // Load default image from public/ if present
+  // This attempts to load "/L25155.jpg" once on mount when no image is loaded
+  // and silently does nothing if the file is missing.
+  useEffect(() => {
+    if (loadedImage) return;
+    const defaultUrl = '/L25155.jpg';
+    const img = new Image();
+    img.onload = () => {
+      setLoadedImage(defaultUrl);
+      setImageInfo({
+        name: 'L25155.jpg',
+        size: 'static asset',
+        dimensions: `${img.width} × ${img.height}px`,
+      });
+    };
+    img.onerror = () => {/* ignore if not present */};
+    img.src = defaultUrl;
+  }, [loadedImage, setLoadedImage]);
   
   const handleFile = useCallback(async (file: File) => {
     setError(null);
