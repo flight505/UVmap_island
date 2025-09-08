@@ -44,6 +44,21 @@ export default function ImageUploader() {
     img.onerror = () => {/* ignore if not present */};
     img.src = defaultUrl;
   }, [loadedImage, setLoadedImage]);
+
+  // If a default image is already set (e.g., from the store), populate the UI card info
+  useEffect(() => {
+    if (!loadedImage || imageInfo) return;
+    const img = new Image();
+    img.onload = () => {
+      setImageInfo({
+        name: loadedImage.split('/').pop() || 'image',
+        size: 'static asset',
+        dimensions: `${img.width} × ${img.height}px`,
+      });
+    };
+    img.onerror = () => {/* ignore */};
+    img.src = loadedImage;
+  }, [loadedImage, imageInfo]);
   
   const handleFile = useCallback(async (file: File) => {
     setError(null);
