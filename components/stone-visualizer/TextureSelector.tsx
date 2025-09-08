@@ -339,7 +339,9 @@ export default function TextureSelector() {
   
   return (
     <Dialog open={selectorOpen} onOpenChange={setSelectorOpen}>
-      <DialogContent className="w-[98vw] h-[98vh] max-h-[98vh] overflow-hidden flex flex-col">
+      <DialogContent 
+        className="!w-[98vw] !max-w-[98vw] h-[98vh] max-h-[98vh] overflow-hidden flex flex-col"
+        style={{ maxWidth: '98vw', width: '98vw' }}>
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Position Stone Cuts</span>
