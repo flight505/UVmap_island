@@ -9,7 +9,8 @@ import {
   PerspectiveCamera,
   useTexture,
   Box,
-  Stats
+  Stats,
+  ContactShadows
 } from '@react-three/drei';
 // import type { OrbitControls } from 'three-stdlib';
 import * as THREE from 'three';
@@ -49,6 +50,7 @@ function IslandMesh({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const { islandDimensions, materialSettings, cameraSettings, selections } = useStore();
+  const { gl } = useThree();
   
   // Auto-rotate if enabled
   useFrame((state, delta) => {
@@ -66,8 +68,11 @@ function IslandMesh({
       texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearMipMapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
-      texture.anisotropy = 16;
+      const maxAniso = gl.capabilities.getMaxAnisotropy?.() || 16;
+      texture.anisotropy = Math.min(32, maxAniso);
       texture.generateMipmaps = true;
+      // Proper color management for photographic textures
+      texture.colorSpace = THREE.SRGBColorSpace;
       
       // No rotation/flip at runtime; it's baked into the bitmap
       texture.center.set(0.5, 0.5);
@@ -91,31 +96,40 @@ function IslandMesh({
   const geometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth);
   
   
-  // Create materials for each face
+  // Create materials for each face (use Physical material for richer highlights)
   const materials = [
-    // Right face (+X) - right end of island
-    new THREE.MeshStandardMaterial({ 
-      map: rightTexture,
+    // Right face (+X)
+    new THREE.MeshPhysicalMaterial({ 
+      map: rightTexture || undefined,
       color: rightTexture ? 0xffffff : 0x707070,
       roughness: materialSettings.roughness,
-      metalness: materialSettings.metalness,
+      metalness: Math.min(1, materialSettings.metalness),
       envMapIntensity: materialSettings.envMapIntensity,
+      clearcoat: 0.1,
+      clearcoatRoughness: 0.6,
+      ior: 1.45,
     }),
-    // Left face (-X) - left end of island
-    new THREE.MeshStandardMaterial({ 
-      map: leftTexture,
+    // Left face (-X)
+    new THREE.MeshPhysicalMaterial({ 
+      map: leftTexture || undefined,
       color: leftTexture ? 0xffffff : 0x707070,
       roughness: materialSettings.roughness,
-      metalness: materialSettings.metalness,
+      metalness: Math.min(1, materialSettings.metalness),
       envMapIntensity: materialSettings.envMapIntensity,
+      clearcoat: 0.1,
+      clearcoatRoughness: 0.6,
+      ior: 1.45,
     }),
     // Top face (+Y)
-    new THREE.MeshStandardMaterial({ 
-      map: topTexture,
+    new THREE.MeshPhysicalMaterial({ 
+      map: topTexture || undefined,
       color: topTexture ? 0xffffff : 0x808080,
-      roughness: materialSettings.roughness,
-      metalness: materialSettings.metalness,
-      envMapIntensity: materialSettings.envMapIntensity,
+      roughness: Math.max(0.2, materialSettings.roughness * 0.9),
+      metalness: Math.min(1, materialSettings.metalness),
+      envMapIntensity: materialSettings.envMapIntensity * 1.1,
+      clearcoat: 0.2,
+      clearcoatRoughness: 0.5,
+      ior: 1.45,
     }),
     // Bottom face (-Y)
     new THREE.MeshStandardMaterial({ 
@@ -123,13 +137,13 @@ function IslandMesh({
       roughness: 0.8,
       metalness: 0.2,
     }),
-    // Front face (+Z) - front side with drawers
+    // Front face (+Z)
     new THREE.MeshStandardMaterial({ 
       color: 0x606060,
       roughness: materialSettings.roughness,
       metalness: materialSettings.metalness,
     }),
-    // Back face (-Z) - back side with drawers
+    // Back face (-Z)
     new THREE.MeshStandardMaterial({ 
       color: 0x606060,
       roughness: materialSettings.roughness,
@@ -159,30 +173,42 @@ function Scene() {
   // Set pixel ratio for high DPI displays
   useEffect(() => {
     gl.setPixelRatio(window.devicePixelRatio);
+    gl.outputColorSpace = THREE.SRGBColorSpace;
+    gl.toneMapping = THREE.ACESFilmicToneMapping;
+    gl.toneMappingExposure = 1.1;
+    gl.shadowMap.enabled = true;
+    gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Improve light energy handling
+    // @ts-expect-error legacy flag present in r180
+    gl.physicallyCorrectLights = true;
   }, [gl]);
   
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.6 * viewSettings.lightIntensity} />
+      {/* Lighting: balanced, natural */}
+      <hemisphereLight intensity={0.35 * viewSettings.lightIntensity} groundColor="#3a3a3a" />
+      {/* Key light */}
       <directionalLight
-        position={[5, 10, 5]}
-        intensity={0.8 * viewSettings.lightIntensity}
+        color={0xfff1e0}
+        position={[6, 8, 4]}
+        intensity={1.1 * viewSettings.lightIntensity}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={50}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
+        shadow-camera-far={60}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
       />
-      <pointLight 
-        position={[-5, 5, -5]} 
-        intensity={0.5 * viewSettings.lightIntensity} 
+      {/* Rim/fill light */}
+      <directionalLight
+        color={0xdfeaff}
+        position={[-7, 5, -6]}
+        intensity={0.6 * viewSettings.lightIntensity}
       />
       
       {/* Environment for reflections */}
-      <Environment preset="studio" />
+      <Environment preset="apartment" />
       
       {/* Kitchen Island */}
       <Suspense fallback={<Box args={[2, 1, 1]} />}>
@@ -217,6 +243,17 @@ function Scene() {
           followCamera={false}
         />
       )}
+      {/* Soft contact shadows for grounding */}
+      <ContactShadows 
+        position={[0, -(islandDimensions.height * SCALE) / 2 - 0.005, 0]}
+        opacity={0.35}
+        width={10}
+        height={10}
+        blur={2.5}
+        far={8}
+        resolution={1024}
+        frames={1}
+      />
       
       {/* Measurement indicators would go here */}
       {viewSettings.showMeasurements && (
