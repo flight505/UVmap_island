@@ -57,29 +57,23 @@ function IslandMesh({
     }
   });
   
-  // Configure textures for high quality; apply rotation + flips at render time
+  // Configure textures for high quality; no runtime rotation/flips (baked during extraction)
   useEffect(() => {
     const configureTexture = (texture: THREE.Texture | null | undefined, selection?: { rotation: number; flipH: boolean; flipV: boolean }) => {
       if (!texture) return;
-      // Use RepeatWrapping to support negative repeats for flips
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.wrapT = THREE.RepeatWrapping;
+      // Clamp to edges to avoid seams since we don't repeat/flip at runtime
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.minFilter = THREE.LinearMipMapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.anisotropy = 16;
       texture.generateMipmaps = true;
       
-      // Apply rotation around center; invert sign to match 2D canvas orientation
+      // No rotation/flip at runtime; it's baked into the bitmap
       texture.center.set(0.5, 0.5);
-      const rotationDegrees = selection?.rotation ?? 0;
-      texture.rotation = - (rotationDegrees * Math.PI) / 180;
-      
-      const flipH = selection?.flipH ?? false;
-      const flipV = selection?.flipV ?? false;
-      const repeatX = flipH ? -1 : 1;
-      const repeatY = flipV ? -1 : 1;
-      texture.repeat.set(repeatX, repeatY);
-      texture.offset.set(flipH ? 1 : 0, flipV ? 1 : 0);
+      texture.rotation = 0;
+      texture.repeat.set(1, 1);
+      texture.offset.set(0, 0);
       
       texture.needsUpdate = true;
     };

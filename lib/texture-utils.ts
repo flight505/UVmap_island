@@ -100,10 +100,9 @@ export async function extractTextureFromSelection(
         const srcW = selection.width * scaleX;
         const srcH = selection.height * scaleY;
         
-        // We'll bake rotation into the crop while preserving the output aspect (srcW x srcH).
-        // That means for 90°/270° we sample a swapped source rectangle around the selection center,
-        // draw it onto a canvas of size srcW×srcH with a rotation transform, so the output aspect
-        // remains identical to the 3D face while the content is rotated.
+        // We'll bake rotation and flips into the crop while preserving the output aspect (srcW x srcH).
+        // For 90°/270° we sample a swapped source rectangle around the selection center, and draw
+        // onto a canvas of size srcW×srcH with transforms. This avoids runtime letterboxing.
         const rotation = (selection.rotation || 0) % 360;
         const isRotated90or270 = rotation === 90 || rotation === 270;
         const outputWidth = srcW;
@@ -117,30 +116,39 @@ export async function extractTextureFromSelection(
         // Create canvas for the texture with correct dimensions
         const { canvas, ctx } = createHighResCanvas(texWidth, texHeight);
         
-        // Compute center-anchored source crop. If rotated 90/270, sample swapped dimensions.
+        // Compute center-anchored source crop. If rotated 90/270, sample swapped dimensions
         const centerX = srcX + srcW / 2;
         const centerY = srcY + srcH / 2;
         const sampleSrcW = isRotated90or270 ? srcH : srcW;
         const sampleSrcH = isRotated90or270 ? srcW : srcH;
         let sampleX = centerX - sampleSrcW / 2;
         let sampleY = centerY - sampleSrcH / 2;
-        
-        // Clamp sampling rectangle inside the image bounds
         sampleX = Math.max(0, Math.min(img.width - sampleSrcW, sampleX));
         sampleY = Math.max(0, Math.min(img.height - sampleSrcH, sampleY));
-        
-        // Clear and draw with rotation so the resulting bitmap has the same aspect as the face
+
+        // Draw sampled region into a temp canvas first
+        const temp = document.createElement('canvas');
+        temp.width = Math.max(1, Math.round(sampleSrcW));
+        temp.height = Math.max(1, Math.round(sampleSrcH));
+        const tctx = temp.getContext('2d');
+        if (!tctx) throw new Error('Failed to create intermediate canvas');
+        tctx.imageSmoothingEnabled = true;
+        tctx.imageSmoothingQuality = 'high';
+        tctx.drawImage(img, sampleX, sampleY, sampleSrcW, sampleSrcH, 0, 0, temp.width, temp.height);
+
+        // Clear and draw rotated/flipped so the resulting bitmap fills the output without bars
         ctx.clearRect(0, 0, texWidth, texHeight);
         ctx.save();
         ctx.translate(texWidth / 2, texHeight / 2);
+        const flipH = selection.flipH || false;
+        const flipV = selection.flipV || false;
+        if (flipH || flipV) ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
         if (rotation !== 0) ctx.rotate((rotation * Math.PI) / 180);
-        ctx.translate(-texWidth / 2, -texHeight / 2);
-        
-        ctx.drawImage(
-          img,
-          sampleX, sampleY, sampleSrcW, sampleSrcH,
-          0, 0, texWidth, texHeight
-        );
+
+        // Choose destination draw size so the rotated bounding box equals the canvas size
+        const destW = isRotated90or270 ? texHeight : texWidth;
+        const destH = isRotated90or270 ? texWidth : texHeight;
+        ctx.drawImage(temp, -destW / 2, -destH / 2, destW, destH);
         ctx.restore();
         
         // Convert to data URL
