@@ -18,6 +18,9 @@ const defaultSelection = (width: number, height: number): Selection => {
     width: width * scale,
     height: height * scale,
     aspectRatio: width / height,
+    rotation: 0, // Default to no rotation
+    flipH: false, // Default to no horizontal flip
+    flipV: false, // Default to no vertical flip
   };
 };
 

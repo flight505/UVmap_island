@@ -59,23 +59,43 @@ function IslandMesh({
   
   // Configure textures for high quality
   useEffect(() => {
-    [topTexture, leftTexture, rightTexture].forEach(texture => {
+    // Configure top texture
+    if (topTexture) {
+      topTexture.wrapS = THREE.ClampToEdgeWrapping;
+      topTexture.wrapT = THREE.ClampToEdgeWrapping;
+      topTexture.minFilter = THREE.LinearMipMapLinearFilter;
+      topTexture.magFilter = THREE.LinearFilter;
+      topTexture.anisotropy = 16;
+      topTexture.generateMipmaps = true;
+      // Top texture should fill the face (length x width)
+      topTexture.repeat.set(1, 1);
+      topTexture.offset.set(0, 0);
+    }
+    
+    // Configure side textures with proper aspect ratio correction
+    [leftTexture, rightTexture].forEach(texture => {
       if (texture) {
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
         texture.minFilter = THREE.LinearMipMapLinearFilter;
         texture.magFilter = THREE.LinearFilter;
         texture.anisotropy = 16;
         texture.generateMipmaps = true;
+        // Side textures need aspect correction
+        // The texture is width x height, but the face might have different proportions
+        texture.repeat.set(1, 1);
+        texture.offset.set(0, 0);
       }
     });
   }, [topTexture, leftTexture, rightTexture]);
   
-  const geometry = new THREE.BoxGeometry(
-    islandDimensions.length * SCALE,
-    islandDimensions.height * SCALE,
-    islandDimensions.width * SCALE
-  );
+  // Create geometry with proper dimensions
+  const boxWidth = islandDimensions.length * SCALE;
+  const boxHeight = islandDimensions.height * SCALE;
+  const boxDepth = islandDimensions.width * SCALE;
+  
+  const geometry = new THREE.BoxGeometry(boxWidth, boxHeight, boxDepth);
+  
   
   // Create materials for each face
   const materials = [

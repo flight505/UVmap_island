@@ -11,6 +11,9 @@ export interface Selection {
   width: number;
   height: number;
   aspectRatio: number;
+  rotation: number; // 0, 90, 180, or 270 degrees
+  flipH: boolean; // Horizontal flip
+  flipV: boolean; // Vertical flip
 }
 
 export interface TextureSelection {

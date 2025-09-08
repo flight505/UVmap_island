@@ -19,15 +19,22 @@ export function calculateOptimalTextureDimensions(
 ): { width: number; height: number } {
   const aspectRatio = width / height;
   
-  if (width > height) {
-    const newWidth = Math.min(nextPowerOf2(width), maxSize);
-    const newHeight = Math.min(nextPowerOf2(newWidth / aspectRatio), maxSize);
-    return { width: newWidth, height: newHeight };
-  } else {
-    const newHeight = Math.min(nextPowerOf2(height), maxSize);
-    const newWidth = Math.min(nextPowerOf2(newHeight * aspectRatio), maxSize);
-    return { width: newWidth, height: newHeight };
+  // Simply ensure dimensions don't exceed maxSize while maintaining aspect ratio
+  // Don't force power-of-2 dimensions as this distorts the aspect ratio
+  if (width > maxSize || height > maxSize) {
+    if (width > height) {
+      const newWidth = maxSize;
+      const newHeight = Math.round(maxSize / aspectRatio);
+      return { width: newWidth, height: newHeight };
+    } else {
+      const newHeight = maxSize;
+      const newWidth = Math.round(maxSize * aspectRatio);
+      return { width: newWidth, height: newHeight };
+    }
   }
+  
+  // Return exact dimensions to maintain perfect aspect ratio
+  return { width: Math.round(width), height: Math.round(height) };
 }
 
 /**
@@ -75,7 +82,8 @@ export async function extractTextureFromSelection(
   imageUrl: string,
   selection: Selection,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  surface?: 'top' | 'left' | 'right'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -92,21 +100,67 @@ export async function extractTextureFromSelection(
         const srcW = selection.width * scaleX;
         const srcH = selection.height * scaleY;
         
-        // Calculate optimal texture dimensions
+        // Get transformation settings
+        const rotation = selection.rotation || 0;
+        const flipH = selection.flipH || false;
+        const flipV = selection.flipV || false;
+        
+        // When rotated 90 or 270, the output dimensions need to swap
+        // to maintain the correct aspect ratio for the 3D face
+        const isRotated90or270 = rotation === 90 || rotation === 270;
+        
+        // Calculate final texture dimensions
+        // If rotated 90/270, swap dimensions so output matches expected face aspect ratio
+        const finalWidth = isRotated90or270 ? srcH : srcW;
+        const finalHeight = isRotated90or270 ? srcW : srcH;
+        
         const { width: texWidth, height: texHeight } = calculateOptimalTextureDimensions(
-          srcW,
-          srcH
+          finalWidth,
+          finalHeight
         );
         
-        // Create high-res canvas for the texture
+        // Create canvas with the correct output dimensions
         const { canvas, ctx } = createHighResCanvas(texWidth, texHeight);
         
-        // Draw the selected portion of the image
-        ctx.drawImage(
-          img,
-          srcX, srcY, srcW, srcH,  // Source rectangle
-          0, 0, texWidth, texHeight // Destination rectangle
-        );
+        // Set up transformations
+        ctx.save();
+        
+        // Clear canvas and set background
+        ctx.clearRect(0, 0, texWidth, texHeight);
+        
+        // Move to center for transformations
+        ctx.translate(texWidth / 2, texHeight / 2);
+        
+        // Apply rotation
+        if (rotation !== 0) {
+          ctx.rotate((rotation * Math.PI) / 180);
+        }
+        
+        // Apply flips
+        if (flipH) ctx.scale(-1, 1);
+        if (flipV) ctx.scale(1, -1);
+        
+        // Move back, accounting for dimension changes
+        if (isRotated90or270) {
+          // When rotated, we need to draw at swapped dimensions
+          ctx.translate(-texHeight / 2, -texWidth / 2);
+          // Draw with swapped destination dimensions
+          ctx.drawImage(
+            img,
+            srcX, srcY, srcW, srcH,  // Source rectangle
+            0, 0, texHeight, texWidth // Destination - swapped for rotation
+          );
+        } else {
+          ctx.translate(-texWidth / 2, -texHeight / 2);
+          // Draw normally
+          ctx.drawImage(
+            img,
+            srcX, srcY, srcW, srcH,  // Source rectangle
+            0, 0, texWidth, texHeight // Destination rectangle
+          );
+        }
+        
+        ctx.restore();
         
         // Convert to data URL
         resolve(canvas.toDataURL('image/png'));

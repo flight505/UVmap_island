@@ -11,14 +11,18 @@ import { Toggle } from '@/components/ui/toggle';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
-  ZoomIn, 
-  ZoomOut, 
   Move, 
   Grid3x3, 
   Maximize2,
   RotateCcw,
+  RotateCw,
+  FlipHorizontal,
+  FlipVertical,
   Check,
-  X
+  X,
+  Info,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 
 const MIN_CANVAS_WIDTH = 1600;
@@ -47,13 +51,14 @@ export default function TextureSelector() {
   const [showGrid, setShowGrid] = useState(true);
   const [showAlignment, setShowAlignment] = useState(true);
   const [canvasSize, setCanvasSize] = useState({ width: MIN_CANVAS_WIDTH, height: MIN_CANVAS_HEIGHT });
+  const [selectedSurface, setSelectedSurface] = useState<'top' | 'left' | 'right' | null>(null);
+  const [imageZoom, setImageZoom] = useState(1);
+  const [baseCanvasSize, setBaseCanvasSize] = useState({ width: MIN_CANVAS_WIDTH, height: MIN_CANVAS_HEIGHT });
   
   const {
     loadedImage,
     selectorOpen,
     setSelectorOpen,
-    selectorZoom,
-    setSelectorZoom,
     selectorPan,
     setSelectorPan,
     selections,
@@ -63,7 +68,38 @@ export default function TextureSelector() {
     setSlabDimensions,
   } = useStore();
   
-  // Cache the image when it changes
+  // Function to rotate a selection
+  const rotateSelection = (surface: 'top' | 'left' | 'right', direction: 'cw' | 'ccw') => {
+    const selection = selections[surface];
+    const currentRotation = selection.rotation || 0;
+    const newRotation = direction === 'cw' 
+      ? (currentRotation + 90) % 360
+      : (currentRotation - 90 + 360) % 360;
+    
+    updateSelection(surface, {
+      ...selection,
+      rotation: newRotation,
+    });
+  };
+
+  // Function to flip a selection
+  const flipSelection = (surface: 'top' | 'left' | 'right', direction: 'horizontal' | 'vertical') => {
+    const selection = selections[surface];
+    
+    if (direction === 'horizontal') {
+      updateSelection(surface, {
+        ...selection,
+        flipH: !selection.flipH,
+      });
+    } else {
+      updateSelection(surface, {
+        ...selection,
+        flipV: !selection.flipV,
+      });
+    }
+  };
+
+  // Cache the image and calculate proper canvas size with consistent scaling
   useEffect(() => {
     if (!loadedImage) {
       cachedImageRef.current = null;
@@ -73,17 +109,88 @@ export default function TextureSelector() {
     const img = new Image();
     img.onload = () => {
       cachedImageRef.current = img;
-      const aspectRatio = img.width / img.height;
-      const baseWidth = Math.max(MIN_CANVAS_WIDTH, Math.min(1200, img.width * 0.8));
-      const baseHeight = baseWidth / aspectRatio;
       
-      setCanvasSize({
-        width: baseWidth * selectorZoom,
-        height: baseHeight * selectorZoom,
+      // CRITICAL: Use a consistent scale where canvas pixels = mm
+      // We'll use a base scale of 0.3 pixels per mm (adjustable with zoom)
+      const BASE_PIXELS_PER_MM = 0.3;
+      
+      // Calculate canvas size based on slab dimensions in mm
+      const baseWidth = slabDimensions.width * BASE_PIXELS_PER_MM;
+      const baseHeight = slabDimensions.height * BASE_PIXELS_PER_MM;
+      
+      // Check if this fits in viewport, if not, reduce the scale
+      const maxWidth = window.innerWidth * 0.94;
+      const maxHeight = window.innerHeight * 0.55;
+      
+      let scale = BASE_PIXELS_PER_MM;
+      if (baseWidth > maxWidth) {
+        scale = maxWidth / slabDimensions.width;
+      }
+      if (baseHeight * (scale / BASE_PIXELS_PER_MM) > maxHeight) {
+        scale = maxHeight / slabDimensions.height;
+      }
+      
+      const finalBaseWidth = slabDimensions.width * scale;
+      const finalBaseHeight = slabDimensions.height * scale;
+      
+      setBaseCanvasSize({ width: finalBaseWidth, height: finalBaseHeight });
+      setCanvasSize({ 
+        width: finalBaseWidth * imageZoom, 
+        height: finalBaseHeight * imageZoom 
       });
     };
     img.src = loadedImage;
-  }, [loadedImage, selectorZoom]);
+  }, [loadedImage, slabDimensions]);
+
+  // Update canvas size when zoom changes
+  useEffect(() => {
+    setCanvasSize({
+      width: baseCanvasSize.width * imageZoom,
+      height: baseCanvasSize.height * imageZoom
+    });
+  }, [imageZoom, baseCanvasSize]);
+
+  // Update selection sizes based on physical dimensions
+  useEffect(() => {
+    if (!cachedImageRef.current || canvasSize.width === 0) return;
+    
+    // The key is to understand the scaling:
+    // 1. The actual image has pixel dimensions (e.g., 6400×1352)
+    // 2. The slab has physical dimensions in mm (e.g., 9060×2020)
+    // 3. The canvas displays the image at a certain size
+    
+    // Calculate the scale factor from physical mm to canvas pixels
+    // This accounts for the image being displayed at canvas size
+    // and representing the physical slab dimensions
+    const mmToCanvasScale = canvasSize.width / slabDimensions.width;
+    
+    // Update selection sizes to represent actual physical dimensions
+    // Top surface: length × width of island
+    const topWidth = islandDimensions.length * mmToCanvasScale;
+    const topHeight = islandDimensions.width * mmToCanvasScale;
+    
+    // Side surfaces: width × height of island  
+    const sideWidth = islandDimensions.width * mmToCanvasScale;
+    const sideHeight = islandDimensions.height * mmToCanvasScale;
+    
+    updateSelection('top', {
+      ...selections.top,
+      width: topWidth,
+      height: topHeight,
+    });
+    
+    updateSelection('left', {
+      ...selections.left,
+      width: sideWidth,
+      height: sideHeight,
+    });
+    
+    updateSelection('right', {
+      ...selections.right,
+      width: sideWidth,
+      height: sideHeight,
+    });
+  }, [canvasSize, slabDimensions, islandDimensions]);
   
   // Draw the canvas
   const drawCanvas = useCallback(() => {
@@ -133,8 +240,76 @@ export default function TextureSelector() {
     }
     
     ctx.restore();
+    
+    // Draw scale ruler (outside of pan transformation)
+    drawScaleRuler(ctx, canvasSize.width, canvasSize.height);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasSize, selectorPan, selections, showGrid, showAlignment]);
+  
+  // Draw scale ruler
+  const drawScaleRuler = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const BASE_PIXELS_PER_MM = 0.3;
+    const rulerHeight = 30;
+    const rulerWidth = 200;
+    const margin = 20;
+    
+    // Position at bottom-left corner
+    const x = margin;
+    const y = height - margin - rulerHeight;
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, rulerWidth, rulerHeight);
+    
+    // Calculate scale
+    const mmRepresented = rulerWidth / BASE_PIXELS_PER_MM;
+    let scaleUnit = 1000; // 1000mm = 1m
+    let scaleText = '1 meter';
+    
+    if (mmRepresented < 500) {
+      scaleUnit = 100;
+      scaleText = '100mm';
+    } else if (mmRepresented < 1000) {
+      scaleUnit = 500;
+      scaleText = '500mm';
+    }
+    
+    const scalePixels = scaleUnit * BASE_PIXELS_PER_MM;
+    
+    // Draw scale bar
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 20);
+    ctx.lineTo(x + 10 + scalePixels, y + 20);
+    ctx.stroke();
+    
+    // Draw end caps
+    ctx.beginPath();
+    ctx.moveTo(x + 10, y + 15);
+    ctx.lineTo(x + 10, y + 25);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(x + 10 + scalePixels, y + 15);
+    ctx.lineTo(x + 10 + scalePixels, y + 25);
+    ctx.stroke();
+    
+    // Draw text
+    ctx.fillStyle = 'white';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(scaleText, x + 10 + scalePixels/2, y + 5);
+    
+    // Show current scale info in top-right
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(width - 180, margin, 160, 25);
+    ctx.fillStyle = 'white';
+    ctx.font = '11px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Scale: 1mm = ${BASE_PIXELS_PER_MM}px`, width - 175, margin + 15);
+  };
   
   // Draw grid overlay
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -167,15 +342,44 @@ export default function TextureSelector() {
     box: SelectionBox,
     selection: typeof selections.top
   ) => {
+    const centerX = selection.x + selection.width / 2;
+    const centerY = selection.y + selection.height / 2;
+    const rotation = selection.rotation || 0;
+    
+    // Draw the rotated and flipped selection
+    ctx.save();
+    
+    // Apply transformations around center
+    ctx.translate(centerX, centerY);
+    
+    // Apply flips
+    const flipH = selection.flipH || false;
+    const flipV = selection.flipV || false;
+    if (flipH) ctx.scale(-1, 1);
+    if (flipV) ctx.scale(1, -1);
+    
+    // Apply rotation
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+    
+    // Draw the main selection rectangle
     ctx.strokeStyle = box.color;
     ctx.lineWidth = 3;
     ctx.fillStyle = box.color + '33'; // 20% opacity
     
-    // Draw rectangle
     ctx.fillRect(selection.x, selection.y, selection.width, selection.height);
     ctx.strokeRect(selection.x, selection.y, selection.width, selection.height);
     
-    // Draw label
+    // Draw corner indicators to show orientation
+    ctx.fillStyle = box.color;
+    ctx.fillRect(selection.x, selection.y, 10, 10); // Top-left corner indicator
+    
+    ctx.restore();
+    
+    // Draw UI elements without rotation
+    ctx.save();
+    
+    // Draw label at center
     ctx.fillStyle = 'white';
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 4;
@@ -183,24 +387,56 @@ export default function TextureSelector() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    const textX = selection.x + selection.width / 2;
-    const textY = selection.y + selection.height / 2;
+    ctx.strokeText(box.label, centerX, centerY);
+    ctx.fillText(box.label, centerX, centerY);
     
-    ctx.strokeText(box.label, textX, textY);
-    ctx.fillText(box.label, textX, textY);
+    // Draw transformation indicators
+    const transforms = [];
+    if (rotation !== 0) transforms.push(`${rotation}°`);
+    if (selection.flipH) transforms.push('↔');
+    if (selection.flipV) transforms.push('↕');
+    
+    if (transforms.length > 0) {
+      ctx.fillStyle = box.color;
+      ctx.font = 'bold 14px Arial';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 3;
+      const transformText = transforms.join(' ');
+      ctx.strokeText(transformText, centerX, centerY + 20);
+      ctx.fillText(transformText, centerX, centerY + 20);
+    }
     
     // Draw actual island surface dimensions
     ctx.font = '12px Arial';
     ctx.fillStyle = box.color;
-    // Show the actual island surface dimensions for each face
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
     let surfaceText = '';
     if (box.surface === 'top') {
       surfaceText = `${islandDimensions.length}×${islandDimensions.width}mm`;
     } else {
-      // Both left and right ends have same dimensions (width×height)
       surfaceText = `${islandDimensions.width}×${islandDimensions.height}mm`;
     }
-    ctx.fillText(surfaceText, textX, selection.y - 5);
+    ctx.strokeText(surfaceText, centerX, centerY - 20);
+    ctx.fillText(surfaceText, centerX, centerY - 20);
+    
+    // Highlight if selected with a border around the rotated shape
+    if (selectedSurface === box.surface) {
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.translate(-centerX, -centerY);
+      
+      ctx.strokeStyle = 'yellow';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10, 5]);
+      ctx.strokeRect(selection.x - 3, selection.y - 3, selection.width + 6, selection.height + 6);
+      ctx.setLineDash([]);
+      
+      ctx.restore();
+    }
+    
+    ctx.restore();
   };
   
   // Draw alignment guides between selections
@@ -233,6 +469,31 @@ export default function TextureSelector() {
     ctx.setLineDash([]);
   };
   
+  // Helper function to check if point is inside rotated rectangle
+  const isPointInRotatedRect = (
+    px: number, 
+    py: number, 
+    selection: typeof selections.top
+  ): boolean => {
+    const centerX = selection.x + selection.width / 2;
+    const centerY = selection.y + selection.height / 2;
+    const rotation = (selection.rotation || 0) * Math.PI / 180;
+    
+    // Translate point to origin (relative to rectangle center)
+    const translatedX = px - centerX;
+    const translatedY = py - centerY;
+    
+    // Rotate point back (inverse rotation)
+    const rotatedX = translatedX * Math.cos(-rotation) - translatedY * Math.sin(-rotation);
+    const rotatedY = translatedX * Math.sin(-rotation) + translatedY * Math.cos(-rotation);
+    
+    // Check if point is inside the unrotated rectangle
+    const halfWidth = selection.width / 2;
+    const halfHeight = selection.height / 2;
+    
+    return Math.abs(rotatedX) <= halfWidth && Math.abs(rotatedY) <= halfHeight;
+  };
+
   // Handle mouse events
   const handleMouseDown = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -241,16 +502,12 @@ export default function TextureSelector() {
     const x = e.clientX - rect.left - selectorPan.x;
     const y = e.clientY - rect.top - selectorPan.y;
     
-    // Check if clicking on a selection box
+    // Check if clicking on a selection box (accounting for rotation)
     for (const box of SELECTION_BOXES) {
       const selection = selections[box.surface];
-      if (
-        x >= selection.x &&
-        x <= selection.x + selection.width &&
-        y >= selection.y &&
-        y <= selection.y + selection.height
-      ) {
+      if (isPointInRotatedRect(x, y, selection)) {
         setIsDragging(box.surface);
+        setSelectedSurface(box.surface);
         setDragOffset({ x: x - selection.x, y: y - selection.y });
         return;
       }
@@ -293,15 +550,37 @@ export default function TextureSelector() {
   
   // Apply textures to 3D model
   const handleApplyTextures = async () => {
-    if (!loadedImage) return;
+    if (!loadedImage || !cachedImageRef.current) return;
     
     // Generate texture URLs for each surface
     const promises = SELECTION_BOXES.map(async (box) => {
+      // Need to convert from canvas coordinates to image coordinates
+      // The canvas might be zoomed, but selections are in canvas coordinates
+      const selection = selections[box.surface];
+      
+      // Create a selection in image coordinates
+      const imageSelection = {
+        ...selection,
+        // No need to adjust for zoom since canvasSize already includes zoom
+        // The extraction function will scale based on canvasSize vs image size
+      };
+      
+      // Pass the target surface so we can maintain proper aspect ratio
+      // If selections are in zoomed coordinates, we need to scale them back
+      const scaledSelection = {
+        ...imageSelection,
+        x: imageSelection.x / imageZoom,
+        y: imageSelection.y / imageZoom,
+        width: imageSelection.width / imageZoom,
+        height: imageSelection.height / imageZoom,
+      };
+      
       const texture = await extractTextureFromSelection(
         loadedImage,
-        selections[box.surface],
-        canvasSize.width,
-        canvasSize.height
+        scaledSelection,
+        baseCanvasSize.width,
+        baseCanvasSize.height,
+        box.surface // Pass surface type for aspect ratio handling
       );
       return { surface: box.surface, texture };
     });
@@ -356,75 +635,166 @@ export default function TextureSelector() {
         </DialogHeader>
         
         <div className="flex-1 flex flex-col space-y-3 overflow-hidden">
-          {/* Calibration Section */}
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <h4 className="text-sm font-medium mb-3 text-amber-900 dark:text-amber-100">
-              📏 Slab Calibration - Total Dimensions of 3 Connected Slabs
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="slab-width" className="text-xs">Total Width of 3 Slabs (mm)</Label>
-                <Input
-                  id="slab-width"
-                  type="number"
-                  value={slabDimensions.width}
-                  onChange={(e) => setSlabDimensions({
-                    ...slabDimensions,
-                    width: parseInt(e.target.value) || 9060
-                  })}
-                  className="h-8"
-                  placeholder="e.g., 9060 for 3×3020mm"
-                />
+          {/* Calibration and Instructions Side-by-Side */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Calibration Section - Left Column */}
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <h4 className="text-sm font-medium mb-2 text-amber-900 dark:text-amber-100">
+                📏 Slab Calibration - Total Dimensions
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="slab-width" className="text-xs">Total Width (mm)</Label>
+                  <Input
+                    id="slab-width"
+                    type="number"
+                    value={slabDimensions.width}
+                    onChange={(e) => setSlabDimensions({
+                      ...slabDimensions,
+                      width: parseInt(e.target.value) || 9600
+                    })}
+                    className="h-8"
+                    placeholder="9600"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="slab-height" className="text-xs">Height (mm)</Label>
+                  <Input
+                    id="slab-height"
+                    type="number"
+                    value={slabDimensions.height}
+                    onChange={(e) => {
+                      const height = parseInt(e.target.value) || 2028;
+                      setSlabDimensions({
+                        ...slabDimensions,
+                        height: height
+                      });
+                    }}
+                    className="h-8"
+                    placeholder="2028"
+                  />
+                </div>
               </div>
-              <div>
-                <Label htmlFor="slab-height" className="text-xs">Slab Height (mm)</Label>
-                <Input
-                  id="slab-height"
-                  type="number"
-                  value={slabDimensions.height}
-                  onChange={(e) => setSlabDimensions({
-                    ...slabDimensions,
-                    height: parseInt(e.target.value) || 2020
-                  })}
-                  className="h-8"
-                  placeholder="e.g., 2020"
-                />
+              {cachedImageRef.current && (
+                <div className="text-xs text-amber-700 dark:text-amber-300 mt-2">
+                  <div>Image: {cachedImageRef.current.width}×{cachedImageRef.current.height}px</div>
+                  <div>Aspect ratio: {(cachedImageRef.current.width / cachedImageRef.current.height).toFixed(2)}</div>
+                  {Math.abs((slabDimensions.width / slabDimensions.height) - (cachedImageRef.current.width / cachedImageRef.current.height)) > 0.1 && (
+                    <div className="text-orange-600 dark:text-orange-400 font-medium mt-1">
+                      ⚠️ Aspect ratio mismatch may cause distortion
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Island Dimensions - Right Column */}
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <h4 className="text-sm font-medium mb-2 text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                Island Cut Dimensions
+              </h4>
+              <div className="space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="font-medium text-blue-900 dark:text-blue-100">Top Surface:</div>
+                    <div className="text-blue-700 dark:text-blue-300">{islandDimensions.length} × {islandDimensions.width}mm</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="font-medium text-blue-900 dark:text-blue-100">Side Surfaces:</div>
+                    <div className="text-blue-700 dark:text-blue-300">{islandDimensions.width} × {islandDimensions.height}mm</div>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-blue-300 dark:border-blue-700">
+                  <div className="text-blue-600 dark:text-blue-400">
+                    Scale: {imageZoom === 1 ? '1:1' : `${(imageZoom * 100).toFixed(0)}%`}
+                  </div>
+                </div>
               </div>
             </div>
-            <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">
-              ℹ️ Your image shows 3 slabs side-by-side. Enter the combined width of all 3 slabs and their height.
-              Position the colored rectangles on each slab area (left, top, right) to map them to your island surfaces.
-            </p>
           </div>
           
           {/* Controls */}
           <div className="flex items-center justify-between gap-4 p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSelectorZoom(Math.max(0.5, selectorZoom - 0.25))}
-              >
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <div className="flex items-center gap-2 min-w-[200px]">
-                <Slider
-                  value={[selectorZoom]}
-                  onValueChange={([v]) => setSelectorZoom(v)}
-                  min={0.5}
-                  max={4}
-                  step={0.25}
-                  className="flex-1"
-                />
-                <span className="text-sm font-medium w-12">{Math.round(selectorZoom * 100)}%</span>
+              {/* Image Zoom Controls */}
+              <div className="flex items-center gap-1 px-2 py-1 bg-background rounded border">
+                <span className="text-xs text-muted-foreground">View:</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setImageZoom(Math.max(0.5, imageZoom - 0.25))}
+                  className="h-6 w-6 p-0"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="h-3 w-3" />
+                </Button>
+                <span className="text-xs font-medium w-12 text-center">
+                  {Math.round(imageZoom * 100)}%
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setImageZoom(Math.min(3, imageZoom + 0.25))}
+                  className="h-6 w-6 p-0"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="h-3 w-3" />
+                </Button>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSelectorZoom(Math.min(4, selectorZoom + 0.25))}
-              >
-                <ZoomIn className="h-4 w-4" />
-              </Button>
+              
+              {/* Transform Controls */}
+              {selectedSurface && (
+                <div className="flex items-center gap-1 px-2 py-1 bg-background rounded border">
+                  <span className="text-xs text-muted-foreground">Transform {selectedSurface}:</span>
+                  <div className="flex gap-1 border-l pl-2 ml-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => rotateSelection(selectedSurface, 'ccw')}
+                      className="h-6 w-6 p-0"
+                      title="Rotate Counter-clockwise"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => rotateSelection(selectedSurface, 'cw')}
+                      className="h-6 w-6 p-0"
+                      title="Rotate Clockwise"
+                    >
+                      <RotateCw className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex gap-1 border-l pl-2 ml-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => flipSelection(selectedSurface, 'horizontal')}
+                      className="h-6 w-6 p-0"
+                      title="Flip Horizontal"
+                    >
+                      <FlipHorizontal className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => flipSelection(selectedSurface, 'vertical')}
+                      className="h-6 w-6 p-0"
+                      title="Flip Vertical"
+                    >
+                      <FlipVertical className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {!selectedSurface && (
+                <div className="text-xs text-muted-foreground px-2">
+                  <Info className="h-3 w-3 inline mr-1" />
+                  Click a selection box to transform it
+                </div>
+              )}
             </div>
             
             <div className="flex items-center gap-2">
@@ -446,12 +816,13 @@ export default function TextureSelector() {
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  setSelectorZoom(1);
                   setSelectorPan({ x: 0, y: 0 });
+                  setImageZoom(1);
+                  setSelectedSurface(null);
                 }}
               >
                 <RotateCcw className="h-4 w-4" />
-                Reset
+                Reset View
               </Button>
             </div>
           </div>
@@ -471,19 +842,6 @@ export default function TextureSelector() {
               className="block"
             />
             
-            {/* Instructions overlay */}
-            <div className="absolute bottom-4 left-4 bg-background/90 backdrop-blur p-3 rounded-md text-sm max-w-md">
-              <div className="flex items-center gap-2 mb-1">
-                <Move className="h-4 w-4" />
-                <span>Position cuts on your 3-slab layout</span>
-              </div>
-              <div className="text-muted-foreground text-xs space-y-1">
-                <div>• Left box → Left slab → Left end of island ({islandDimensions.width}×{islandDimensions.height}mm)</div>
-                <div>• Top box → Middle slab → Top surface ({islandDimensions.length}×{islandDimensions.width}mm)</div>
-                <div>• Right box → Right slab → Right end of island ({islandDimensions.width}×{islandDimensions.height}mm)</div>
-                <div className="pt-1 border-t border-border mt-1">Click and drag boxes to position • Pan with empty space • Zoom with controls</div>
-              </div>
-            </div>
           </div>
           
           {/* Action buttons */}
