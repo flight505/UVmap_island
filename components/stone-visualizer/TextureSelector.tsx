@@ -566,20 +566,12 @@ export default function TextureSelector() {
       };
       
       // Pass the target surface so we can maintain proper aspect ratio
-      // If selections are in zoomed coordinates, we need to scale them back
-      const scaledSelection = {
-        ...imageSelection,
-        x: imageSelection.x / imageZoom,
-        y: imageSelection.y / imageZoom,
-        width: imageSelection.width / imageZoom,
-        height: imageSelection.height / imageZoom,
-      };
-      
+      // Selections are already in the correct coordinate space
       const texture = await extractTextureFromSelection(
         loadedImage,
-        scaledSelection,
-        baseCanvasSize.width,
-        baseCanvasSize.height,
+        imageSelection,
+        canvasSize.width,
+        canvasSize.height,
         box.surface // Pass surface type for aspect ratio handling
       );
       return { surface: box.surface, texture };

@@ -100,66 +100,47 @@ export async function extractTextureFromSelection(
         const srcW = selection.width * scaleX;
         const srcH = selection.height * scaleY;
         
-        // Get transformation settings
-        const rotation = selection.rotation || 0;
-        const flipH = selection.flipH || false;
-        const flipV = selection.flipV || false;
-        
-        // When rotated 90 or 270, the output dimensions need to swap
-        // to maintain the correct aspect ratio for the 3D face
+        // We'll bake rotation into the crop while preserving the output aspect (srcW x srcH).
+        // That means for 90°/270° we sample a swapped source rectangle around the selection center,
+        // draw it onto a canvas of size srcW×srcH with a rotation transform, so the output aspect
+        // remains identical to the 3D face while the content is rotated.
+        const rotation = (selection.rotation || 0) % 360;
         const isRotated90or270 = rotation === 90 || rotation === 270;
-        
-        // Calculate final texture dimensions
-        // If rotated 90/270, swap dimensions so output matches expected face aspect ratio
-        const finalWidth = isRotated90or270 ? srcH : srcW;
-        const finalHeight = isRotated90or270 ? srcW : srcH;
+        const outputWidth = srcW;
+        const outputHeight = srcH;
         
         const { width: texWidth, height: texHeight } = calculateOptimalTextureDimensions(
-          finalWidth,
-          finalHeight
+          outputWidth,
+          outputHeight
         );
         
-        // Create canvas with the correct output dimensions
+        // Create canvas for the texture with correct dimensions
         const { canvas, ctx } = createHighResCanvas(texWidth, texHeight);
         
-        // Set up transformations
-        ctx.save();
+        // Compute center-anchored source crop. If rotated 90/270, sample swapped dimensions.
+        const centerX = srcX + srcW / 2;
+        const centerY = srcY + srcH / 2;
+        const sampleSrcW = isRotated90or270 ? srcH : srcW;
+        const sampleSrcH = isRotated90or270 ? srcW : srcH;
+        let sampleX = centerX - sampleSrcW / 2;
+        let sampleY = centerY - sampleSrcH / 2;
         
-        // Clear canvas and set background
+        // Clamp sampling rectangle inside the image bounds
+        sampleX = Math.max(0, Math.min(img.width - sampleSrcW, sampleX));
+        sampleY = Math.max(0, Math.min(img.height - sampleSrcH, sampleY));
+        
+        // Clear and draw with rotation so the resulting bitmap has the same aspect as the face
         ctx.clearRect(0, 0, texWidth, texHeight);
-        
-        // Move to center for transformations
+        ctx.save();
         ctx.translate(texWidth / 2, texHeight / 2);
+        if (rotation !== 0) ctx.rotate((rotation * Math.PI) / 180);
+        ctx.translate(-texWidth / 2, -texHeight / 2);
         
-        // Apply rotation
-        if (rotation !== 0) {
-          ctx.rotate((rotation * Math.PI) / 180);
-        }
-        
-        // Apply flips
-        if (flipH) ctx.scale(-1, 1);
-        if (flipV) ctx.scale(1, -1);
-        
-        // Move back, accounting for dimension changes
-        if (isRotated90or270) {
-          // When rotated, we need to draw at swapped dimensions
-          ctx.translate(-texHeight / 2, -texWidth / 2);
-          // Draw with swapped destination dimensions
-          ctx.drawImage(
-            img,
-            srcX, srcY, srcW, srcH,  // Source rectangle
-            0, 0, texHeight, texWidth // Destination - swapped for rotation
-          );
-        } else {
-          ctx.translate(-texWidth / 2, -texHeight / 2);
-          // Draw normally
-          ctx.drawImage(
-            img,
-            srcX, srcY, srcW, srcH,  // Source rectangle
-            0, 0, texWidth, texHeight // Destination rectangle
-          );
-        }
-        
+        ctx.drawImage(
+          img,
+          sampleX, sampleY, sampleSrcW, sampleSrcH,
+          0, 0, texWidth, texHeight
+        );
         ctx.restore();
         
         // Convert to data URL

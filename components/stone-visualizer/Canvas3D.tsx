@@ -48,7 +48,7 @@ function IslandMesh({
   rightTexture?: THREE.Texture | null;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const { islandDimensions, materialSettings, cameraSettings } = useStore();
+  const { islandDimensions, materialSettings, cameraSettings, selections } = useStore();
   
   // Auto-rotate if enabled
   useFrame((state, delta) => {
@@ -57,37 +57,35 @@ function IslandMesh({
     }
   });
   
-  // Configure textures for high quality
+  // Configure textures for high quality; apply flips only (rotation baked during extraction)
   useEffect(() => {
-    // Configure top texture
-    if (topTexture) {
-      topTexture.wrapS = THREE.ClampToEdgeWrapping;
-      topTexture.wrapT = THREE.ClampToEdgeWrapping;
-      topTexture.minFilter = THREE.LinearMipMapLinearFilter;
-      topTexture.magFilter = THREE.LinearFilter;
-      topTexture.anisotropy = 16;
-      topTexture.generateMipmaps = true;
-      // Top texture should fill the face (length x width)
-      topTexture.repeat.set(1, 1);
-      topTexture.offset.set(0, 0);
-    }
+    const configureTexture = (texture: THREE.Texture | null | undefined, selection?: { rotation: number; flipH: boolean; flipV: boolean }) => {
+      if (!texture) return;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.minFilter = THREE.LinearMipMapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.anisotropy = 16;
+      texture.generateMipmaps = true;
+      
+      // Ensure no additional rotation is applied at runtime
+      texture.center.set(0.5, 0.5);
+      texture.rotation = 0;
+      
+      const flipH = selection?.flipH ?? false;
+      const flipV = selection?.flipV ?? false;
+      const repeatX = flipH ? -1 : 1;
+      const repeatY = flipV ? -1 : 1;
+      texture.repeat.set(repeatX, repeatY);
+      texture.offset.set(flipH ? 1 : 0, flipV ? 1 : 0);
+      
+      texture.needsUpdate = true;
+    };
     
-    // Configure side textures with proper aspect ratio correction
-    [leftTexture, rightTexture].forEach(texture => {
-      if (texture) {
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.minFilter = THREE.LinearMipMapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.anisotropy = 16;
-        texture.generateMipmaps = true;
-        // Side textures need aspect correction
-        // The texture is width x height, but the face might have different proportions
-        texture.repeat.set(1, 1);
-        texture.offset.set(0, 0);
-      }
-    });
-  }, [topTexture, leftTexture, rightTexture]);
+    configureTexture(topTexture, selections?.top);
+    configureTexture(leftTexture, selections?.left);
+    configureTexture(rightTexture, selections?.right);
+  }, [topTexture, leftTexture, rightTexture, selections]);
   
   // Create geometry with proper dimensions
   const boxWidth = islandDimensions.length * SCALE;
