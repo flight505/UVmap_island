@@ -52,8 +52,8 @@ export const useStore = create<StoreState>((set, get) => ({
   
   selections: {
     top: defaultSelection(defaultDimensions.length, defaultDimensions.width),
-    left: defaultSelection(defaultDimensions.length, defaultDimensions.height),
-    right: defaultSelection(defaultDimensions.length, defaultDimensions.height),
+    left: defaultSelection(defaultDimensions.width, defaultDimensions.height),
+    right: defaultSelection(defaultDimensions.width, defaultDimensions.height),
   },
   
   appliedTextures: {
@@ -82,8 +82,8 @@ export const useStore = create<StoreState>((set, get) => ({
       islandDimensions: dimensions,
       selections: {
         top: defaultSelection(dimensions.length, dimensions.width),
-        left: defaultSelection(dimensions.length, dimensions.height),
-        right: defaultSelection(dimensions.length, dimensions.height),
+        left: defaultSelection(dimensions.width, dimensions.height),
+        right: defaultSelection(dimensions.width, dimensions.height),
       },
     });
   },

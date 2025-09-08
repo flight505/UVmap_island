@@ -338,10 +338,11 @@ export default function ControlPanel() {
                 <div className="flex items-start gap-2">
                   <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div className="text-xs text-muted-foreground">
-                    <p>Surface areas:</p>
+                    <p>Stone surface areas:</p>
                     <ul className="mt-1 space-y-0.5">
                       <li>• Top: {islandDimensions.length}×{islandDimensions.width}mm</li>
-                      <li>• Sides: {islandDimensions.length}×{islandDimensions.height}mm</li>
+                      <li>• Left end: {islandDimensions.width}×{islandDimensions.height}mm</li>
+                      <li>• Right end: {islandDimensions.width}×{islandDimensions.height}mm</li>
                     </ul>
                   </div>
                 </div>

@@ -197,8 +197,8 @@ export default function TextureSelector() {
     if (box.surface === 'top') {
       surfaceText = `${islandDimensions.length}×${islandDimensions.width}mm`;
     } else {
-      // Both left and right sides have same dimensions
-      surfaceText = `${islandDimensions.length}×${islandDimensions.height}mm`;
+      // Both left and right ends have same dimensions (width×height)
+      surfaceText = `${islandDimensions.width}×${islandDimensions.height}mm`;
     }
     ctx.fillText(surfaceText, textX, selection.y - 5);
   };
@@ -478,9 +478,9 @@ export default function TextureSelector() {
                 <span>Position cuts on your 3-slab layout</span>
               </div>
               <div className="text-muted-foreground text-xs space-y-1">
-                <div>• Left box → Left slab → Left side of island</div>
-                <div>• Top box → Middle slab → Top of island</div>
-                <div>• Right box → Right slab → Right side of island</div>
+                <div>• Left box → Left slab → Left end of island ({islandDimensions.width}×{islandDimensions.height}mm)</div>
+                <div>• Top box → Middle slab → Top surface ({islandDimensions.length}×{islandDimensions.width}mm)</div>
+                <div>• Right box → Right slab → Right end of island ({islandDimensions.width}×{islandDimensions.height}mm)</div>
                 <div className="pt-1 border-t border-border mt-1">Click and drag boxes to position • Pan with empty space • Zoom with controls</div>
               </div>
             </div>

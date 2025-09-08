@@ -79,17 +79,21 @@ function IslandMesh({
   
   // Create materials for each face
   const materials = [
-    // Right face (+X) - short side
+    // Right face (+X) - right end of island
     new THREE.MeshStandardMaterial({ 
-      color: 0x606060,
+      map: rightTexture,
+      color: rightTexture ? 0xffffff : 0x707070,
       roughness: materialSettings.roughness,
       metalness: materialSettings.metalness,
+      envMapIntensity: materialSettings.envMapIntensity,
     }),
-    // Left face (-X) - short side
+    // Left face (-X) - left end of island
     new THREE.MeshStandardMaterial({ 
-      color: 0x606060,
+      map: leftTexture,
+      color: leftTexture ? 0xffffff : 0x707070,
       roughness: materialSettings.roughness,
       metalness: materialSettings.metalness,
+      envMapIntensity: materialSettings.envMapIntensity,
     }),
     // Top face (+Y)
     new THREE.MeshStandardMaterial({ 
@@ -105,21 +109,17 @@ function IslandMesh({
       roughness: 0.8,
       metalness: 0.2,
     }),
-    // Front face (+Z) - long side (right when facing front)
+    // Front face (+Z) - front side with drawers
     new THREE.MeshStandardMaterial({ 
-      map: rightTexture,
-      color: rightTexture ? 0xffffff : 0x707070,
+      color: 0x606060,
       roughness: materialSettings.roughness,
       metalness: materialSettings.metalness,
-      envMapIntensity: materialSettings.envMapIntensity,
     }),
-    // Back face (-Z) - long side (left when facing front)
+    // Back face (-Z) - back side with drawers
     new THREE.MeshStandardMaterial({ 
-      map: leftTexture,
-      color: leftTexture ? 0xffffff : 0x707070,
+      color: 0x606060,
       roughness: materialSettings.roughness,
       metalness: materialSettings.metalness,
-      envMapIntensity: materialSettings.envMapIntensity,
     }),
   ];
   
