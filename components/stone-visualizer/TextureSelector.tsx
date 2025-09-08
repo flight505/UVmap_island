@@ -67,6 +67,33 @@ export default function TextureSelector() {
     slabDimensions,
     setSlabDimensions,
   } = useStore();
+
+  // Align side selections to the top selection edges to reduce DoF
+  const alignSidesToTop = useCallback(() => {
+    const top = selections.top;
+    const left = selections.left;
+    const right = selections.right;
+
+    // Left side aligns its upper-left corner with top's upper-left
+    updateSelection('left', {
+      ...left,
+      x: top.x,
+      y: top.y,
+      rotation: 0,
+      flipH: false,
+      flipV: false,
+    });
+
+    // Right side aligns its upper-right corner with top's upper-right
+    updateSelection('right', {
+      ...right,
+      x: top.x + top.width - right.width,
+      y: top.y,
+      rotation: 0,
+      flipH: false,
+      flipV: false,
+    });
+  }, [selections, updateSelection]);
   
   // Function to rotate a selection
   const rotateSelection = (surface: 'top' | 'left' | 'right', direction: 'cw' | 'ccw') => {
@@ -804,6 +831,15 @@ export default function TextureSelector() {
               >
                 <Maximize2 className="h-4 w-4" />
               </Toggle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={alignSidesToTop}
+                title="Align side cuts to top edges"
+              >
+                <Maximize2 className="h-4 w-4 mr-1" />
+                Align Sides to Top
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
