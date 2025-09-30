@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import ImageUploader from '@/components/stone-visualizer/ImageUploader';
 import TextureSelector from '@/components/stone-visualizer/TextureSelector';
 import ControlPanel from '@/components/stone-visualizer/ControlPanel';
@@ -9,7 +10,6 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Sparkles, 
   Info,
   Github,
   FileText
@@ -39,8 +39,15 @@ export default function Home() {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Sparkles className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold">Kitchen Island Stone Visualizer</h1>
+              <Image
+                src="/molballe-logo.svg"
+                alt="Molballe logo"
+                width={160}
+                height={40}
+                priority
+                className="h-8 w-auto"
+              />
+              <h1 className="text-xl font-bold">Stone Visualizer</h1>
               <Badge variant="secondary">v2.0</Badge>
             </div>
             
