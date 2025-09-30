@@ -1,14 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80">
-  <g fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 62 V22 L35 48 L58 22 V62" />
-    <path d="M90 16 a24 24 0 1 1 0 48 a24 24 0 1 1 0 -48" />
-    <path d="M128 22 V62" />
-    <path d="M158 22 V62" />
-    <path d="M158 42 h24 a18 18 0 1 1 -24 0" />
-    <path d="M234 26 a20 20 0 1 1 0 40 V62" />
-    <path d="M244 22 V62" />
-    <path d="M264 22 V62" />
-    <path d="M298 62 c-13 0 -24 -11 -24 -24 c0 -13 11 -24 24 -24 h14" />
-    <path d="M284 42 h18" />
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 80" role="img" aria-labelledby="title">
+  <title id="title">Molballe</title>
+  <style>
+    .wordmark {
+      font-family: 'Poppins', 'Avenir Next', 'Segoe UI', sans-serif;
+      font-size: 60px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      fill: #111827;
+    }
+  </style>
+  <text x="0" y="56" class="wordmark">molballe</text>
 </svg>
